@@ -18,7 +18,6 @@
   <a href="https://github.com/anson669989/NH-Shelfie/releases/latest">⬇️ Download the latest APK</a>
 </h3>
 
-> ⚠️ This app involves adult content and is intended for users 18 and over only.
 
 ## ✨ Features
 
@@ -81,7 +80,7 @@ All data lives only on your phone. The app collects and uploads nothing, has no 
 
 ## ⚖️ Disclaimer
 
-This is an unofficial personal project and is not affiliated with nhentai in any way. For adults only — please follow the laws where you live.
+This is an unofficial personal project and is not affiliated with nhentai in any way. Please follow the laws where you live.
 
 ---
 
