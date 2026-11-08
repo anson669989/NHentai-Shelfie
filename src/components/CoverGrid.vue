@@ -16,8 +16,10 @@
         @click="selecting ? emit('toggle', item.book) : emit('open', item.book)"
       >
         <div class="cover-box" :style="{ height: coverH + 'px' }">
+          <!-- 媽媽模式：有封面的書只放淺灰方塊，完全不載入圖片（快速捲動也不會閃出封面）；狀態佔位圖照舊 -->
+          <div v-if="hideCover && srcOf(item.book)" class="cover-mama" />
           <img
-            v-if="srcOf(item.book) && !broken[item.book.gallery_id]"
+            v-else-if="srcOf(item.book) && !broken[item.book.gallery_id]"
             :src="srcOf(item.book)"
             loading="lazy"
             decoding="async"
@@ -42,7 +44,8 @@
           </button>
           <span v-if="selecting" class="cover-check" aria-hidden="true">{{ isSelected(item.book) ? '✓' : '' }}</span>
         </div>
-        <div class="cover-title">{{ item.book.title }}</div>
+        <div class="cover-title">{{ hideTitle ? '' : item.book.title }}</div>
+        <div v-if="showNote" class="cover-note">{{ hideNote ? '' : item.book.note || '' }}</div>
       </div>
     </div>
   </div>
@@ -59,12 +62,17 @@ const props = defineProps({
   columns: { type: Number, default: 3 },
   selecting: { type: Boolean, default: false },
   selectedIds: { type: Set, default: () => new Set() },
+  showNote: { type: Boolean, default: false }, // 書名下方多一行備註（每格一樣高）
+  hideCover: { type: Boolean, default: false }, // 媽媽模式
+  hideTitle: { type: Boolean, default: false },
+  hideNote: { type: Boolean, default: false },
 })
 const emit = defineEmits(['open', 'longpress', 'toggle', 'menu'])
 
 const GAP = 6
 const RATIO = 1.42 // 封面高寬比
 const TITLE_H = 36 // 書名固定兩行（12px × 行高 1.35 × 2 + 上下留白），每列一樣高
+const NOTE_H = 18 // 備註一行（.cover-note）
 const BUFFER_ROWS = 3
 
 const scroller = ref(null)
@@ -76,7 +84,8 @@ const broken = reactive({})
 const cols = computed(() => Math.max(2, Math.min(6, props.columns)))
 const cellW = computed(() => Math.max(1, (width.value - GAP * (cols.value + 1)) / cols.value))
 const coverH = computed(() => cellW.value * RATIO)
-const cellH = computed(() => coverH.value + TITLE_H)
+// showNote 切換時每列高度跟著重算
+const cellH = computed(() => coverH.value + TITLE_H + (props.showNote ? NOTE_H : 0))
 const rowH = computed(() => cellH.value + GAP)
 const rows = computed(() => Math.ceil(props.books.length / cols.value))
 const totalHeight = computed(() => rows.value * rowH.value + GAP)

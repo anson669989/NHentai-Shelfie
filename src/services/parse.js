@@ -269,3 +269,25 @@ export function normalizeFolderName(name) {
   if (len < 1 || len > 30) return null
   return s
 }
+
+/**
+ * 備註：單行、不限長度。換行（含 Unicode 行分隔字元）轉成空白，去頭尾空白；空字串回傳 null（存成空值）。
+ * @param {unknown} text
+ * @returns {string|null}
+ */
+export function normalizeNote(text) {
+  const s = singleLine(text).trim()
+  return s ? s : null
+}
+
+/** 把換行字元換成空白（貼上多行文字到單行輸入框時用；不去頭尾空白） */
+export function singleLine(text) {
+  return String(text ?? '').replace(/\r\n|[\r\n\u2028\u2029\u0085]/g, ' ')
+}
+
+/** 「最近加入顯示筆數」的選項與預設 */
+export const RECENT_LIMITS = Object.freeze([10, 20, 30, 40, 50])
+export function normalizeRecentLimit(v) {
+  const n = Number.parseInt(v, 10)
+  return RECENT_LIMITS.includes(n) ? n : 20
+}

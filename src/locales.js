@@ -158,17 +158,37 @@ const zhTW = {
   'add.alreadyHere': "#{id} 已在此資料夾",
   'add.addedExisting': "已加入 #{id}（原本就在：{names}）",
   'share.noId': "分享的內容裡找不到 ID",
+  'book.note': "備註",
+  'book.notePlaceholder': "輸入備註（點旁邊空白處自動儲存）",
+  'settings.showNote': "在封面下方顯示備註",
+  'settings.recentLimit': "「最近加入」顯示筆數",
+  'settings.web': "開啟網頁",
+  'settings.openMode': "開啟網頁方式",
+  'settings.openMode.external': "外部瀏覽器",
+  'settings.openMode.custom_tab': "App 內瀏覽器",
+  'settings.openModeHint': "用外部瀏覽器時，從網頁「分享」回 App 後原本的網頁還在；App 內瀏覽器會在分享時被關掉。",
+  'settings.mama': "媽媽模式",
+  'settings.mamaHint': "旁人看到螢幕時不尷尬。點「⋮」打開的選單照常顯示。",
+  'settings.mamaScope': "套用頁面",
+  'settings.mamaScope.library': "資料夾頁（封面牆）",
+  'settings.mamaScope.add': "新增頁「最近加入」",
+  'settings.mamaHide': "隱藏內容",
+  'settings.mamaHide.cover': "封面",
+  'settings.mamaHide.title': "書名",
+  'settings.mamaHide.note': "備註",
   help: `【新增】到「新增」分頁輸入 gallery ID（也可以貼上網址或 #228922），按「加入」就完成，不用等網路。書名與封面會在背景依序補上；「最近加入」清單會自動更新。資料夾會記住上次的選擇，連續加入不必每本重選。已收藏的書再加入時，只會補進新選的資料夾。
 
 【從瀏覽器分享】在 nhentai 頁面按 Android 的「分享」，選 NH Shelfie，ID 會自動填好，按「加入」即可。
 
 【分類】在「資料夾」分頁上方切換資料夾；選單內可新增資料夾，按資料夾旁的「⋯」可改名、刪除或調整順序。一本書可以放在多個資料夾。
 
-【單本選單】點封面右上角的「⋮」：查看完整標題、複製 ID、分類、從此資料夾移除、重抓封面、刪除。找不到的書可以在這裡「修改 ID」。
+【單本選單】點封面右上角的「⋮」（或在「最近加入」長按一本）：查看完整標題、寫備註（點旁邊空白處自動儲存）、複製 ID、分類、從此資料夾移除、重抓封面、刪除。找不到的書可以在這裡「修改 ID」。
 
 【多選】長按封面進入多選模式，點封面選取或取消，下方可一次分類、從此資料夾移除或刪除。按返回鍵退出多選。
 
-【開啟】點封面會以瀏覽器開啟該本的網頁。
+【開啟】點封面或「最近加入」的橫條會開啟該本的網頁。設定 → 開啟網頁方式 可選外部瀏覽器（預設）或 App 內瀏覽器。
+
+【媽媽模式】設定 → 媽媽模式：把封面換成灰色方塊，也可以隱藏書名或備註，並選擇要套用在哪一頁。
 
 【換機與備份】設定 → 資料 → 匯出 CSV，透過分享面板存到雲端硬碟或傳給自己。新手機安裝後選「匯入 CSV」，書名與封面會依 ID 重新抓取。
 
@@ -334,17 +354,37 @@ const zhCN = {
   'add.alreadyHere': '#{id} 已在此文件夹',
   'add.addedExisting': '已添加 #{id}（原本就在：{names}）',
   'share.noId': '分享的内容里找不到 ID',
+  'book.note': "备注",
+  'book.notePlaceholder': "输入备注（点旁边空白处自动保存）",
+  'settings.showNote': "在封面下方显示备注",
+  'settings.recentLimit': "“最近添加”显示条数",
+  'settings.web': "打开网页",
+  'settings.openMode': "打开网页方式",
+  'settings.openMode.external': "外部浏览器",
+  'settings.openMode.custom_tab': "App 内浏览器",
+  'settings.openModeHint': "用外部浏览器时，从网页“分享”回 App 后原来的网页还在；App 内浏览器会在分享时被关掉。",
+  'settings.mama': "妈妈模式",
+  'settings.mamaHint': "旁人看到屏幕时不尴尬。点“⋮”打开的菜单照常显示。",
+  'settings.mamaScope': "应用页面",
+  'settings.mamaScope.library': "文件夹页（封面墙）",
+  'settings.mamaScope.add': "添加页“最近添加”",
+  'settings.mamaHide': "隐藏内容",
+  'settings.mamaHide.cover': "封面",
+  'settings.mamaHide.title': "标题",
+  'settings.mamaHide.note': "备注",
   help: `【添加】在“添加”页输入 gallery ID（也可以粘贴网址或 #228922），点“添加”即可，无需等待网络。标题和封面会在后台依次补全，“最近添加”列表会自动更新。文件夹会记住上次的选择，连续添加时不用每本都重新选。已收藏的本子再次添加时，只会加入新选的文件夹。
 
 【从浏览器分享】在 nhentai 页面点 Android 的“分享”，选择 NH Shelfie，ID 会自动填好，点“添加”即可。
 
 【分类】在“文件夹”页顶部切换文件夹；菜单里可以新建文件夹，点文件夹旁的“⋯”可以重命名、删除或调整顺序。一本可以放进多个文件夹。
 
-【单本菜单】点封面右上角的“⋮”：查看完整标题、复制 ID、分类、从此文件夹移除、重新获取封面、删除。找不到的本子可以在这里“修改 ID”。
+【单本菜单】点封面右上角的“⋮”（或在“最近添加”长按一本）：查看完整标题、写备注（点旁边空白处自动保存）、复制 ID、分类、从此文件夹移除、重新获取封面、删除。找不到的本子可以在这里“修改 ID”。
 
 【多选】长按封面进入多选模式，点封面选中或取消，底部可以批量分类、从此文件夹移除或删除。按返回键退出多选。
 
-【打开】点封面会用浏览器打开对应网页。
+【打开】点封面或“最近添加”的横条会打开对应网页。设置 → 打开网页方式 可选外部浏览器（默认）或 App 内浏览器。
+
+【妈妈模式】设置 → 妈妈模式：把封面换成灰色方块，也可以隐藏标题或备注，并选择应用在哪一页。
 
 【换机与备份】设置 → 数据 → 导出 CSV，通过分享面板保存到网盘或发给自己。新手机安装后选择“导入 CSV”，标题和封面会根据 ID 重新获取。
 
@@ -510,17 +550,37 @@ const en = {
   'add.alreadyHere': "#{id} is already in this folder",
   'add.addedExisting': "Added #{id} (already in: {names})",
   'share.noId': "No gallery ID found in the shared content",
+  'book.note': "Note",
+  'book.notePlaceholder': "Add a note (saved when you tap elsewhere)",
+  'settings.showNote': "Show notes under covers",
+  'settings.recentLimit': "Items in \"Recently added\"",
+  'settings.web': "Opening pages",
+  'settings.openMode': "Open pages in",
+  'settings.openMode.external': "External browser",
+  'settings.openMode.custom_tab': "In-app browser",
+  'settings.openModeHint': "With the external browser, the page stays open after you share it back to the app; the in-app browser closes when you share.",
+  'settings.mama': "Privacy mode",
+  'settings.mamaHint': "Nothing awkward if someone glances at your screen. The \"⋮\" menu still shows everything.",
+  'settings.mamaScope': "Apply to",
+  'settings.mamaScope.library': "Folders page (cover grid)",
+  'settings.mamaScope.add': "\"Recently added\" on the Add page",
+  'settings.mamaHide': "Hide",
+  'settings.mamaHide.cover': "Covers",
+  'settings.mamaHide.title': "Titles",
+  'settings.mamaHide.note': "Notes",
   help: `[Add] In the Add tab, enter a gallery ID (a URL or #228922 also works) and tap Add — no waiting for the network. Title and cover are filled in one by one in the background, and the "Recently added" list updates by itself. Your last folder choice is remembered, so you don't have to pick it again for every item. Adding an item you already have only puts it into the newly selected folders.
 
 [Share from browser] On an nhentai page, tap Android's Share and choose NH Shelfie. The ID is filled in for you — just tap Add.
 
 [Folders] Switch folders at the top of the Folders tab. Create folders from the menu; tap "⋯" next to a folder to rename, delete or reorder it. An item can be in several folders.
 
-[Item menu] Tap "⋮" at the top-right of a cover to see the full titles, copy the ID, choose folders, remove from this folder, re-fetch the cover or delete. For items that were not found, you can "Change ID" here.
+[Item menu] Tap "⋮" at the top-right of a cover (or long-press an item in "Recently added") to see the full titles, write a note (saved when you tap elsewhere), copy the ID, choose folders, remove from this folder, re-fetch the cover or delete. For items that were not found, you can "Change ID" here.
 
 [Multi-select] Long-press a cover to start selecting; tap covers to select or deselect, then use the bottom bar to add to folders, remove from this folder or delete. Press Back to leave multi-select.
 
-[Open] Tap a cover to open its page in the browser.
+[Open] Tap a cover or a row in "Recently added" to open its page. Settings → Open pages in lets you choose the external browser (default) or the in-app browser.
+
+[Privacy mode] Settings → Privacy mode replaces covers with grey boxes and can also hide titles or notes, on the pages you choose.
 
 [Backup / new phone] Settings → Data → Export CSV, then save it via the share sheet. On the new phone, Import CSV and titles and covers are fetched again by ID.
 
@@ -686,17 +746,37 @@ const ja = {
   'add.alreadyHere': "#{id} はすでにこのフォルダにあります",
   'add.addedExisting': "#{id} を追加しました（既存：{names}）",
   'share.noId': "共有された内容に ID が見つかりません",
+  'book.note': "メモ",
+  'book.notePlaceholder': "メモを入力（ほかの場所をタップで自動保存）",
+  'settings.showNote': "表紙の下にメモを表示",
+  'settings.recentLimit': "「最近追加」の表示件数",
+  'settings.web': "ページを開く",
+  'settings.openMode': "ページの開き方",
+  'settings.openMode.external': "外部ブラウザ",
+  'settings.openMode.custom_tab': "アプリ内ブラウザ",
+  'settings.openModeHint': "外部ブラウザなら、ページから「共有」でアプリに戻っても元のページが残ります。アプリ内ブラウザは共有時に閉じられます。",
+  'settings.mama': "ママモード",
+  'settings.mamaHint': "画面を見られても気まずくならないように隠します。「⋮」メニューは通常どおり表示されます。",
+  'settings.mamaScope': "適用するページ",
+  'settings.mamaScope.library': "フォルダページ（表紙一覧）",
+  'settings.mamaScope.add': "追加ページの「最近追加」",
+  'settings.mamaHide': "隠す内容",
+  'settings.mamaHide.cover': "表紙",
+  'settings.mamaHide.title': "タイトル",
+  'settings.mamaHide.note': "メモ",
   help: `【追加】「追加」タブで gallery ID（URL や #228922 も可）を入力し、「追加」を押すだけで完了です。通信を待つ必要はありません。タイトルと表紙はバックグラウンドで順番に取得され、「最近追加」の一覧も自動で更新されます。前回選んだフォルダを覚えているので、続けて追加するときに毎回選び直す必要はありません。保存済みの作品を追加した場合は、新しく選んだフォルダに入れるだけです。
 
 【ブラウザから共有】nhentai のページで Android の「共有」から NH Shelfie を選ぶと、ID が自動入力されます。「追加」を押せば完了です。
 
 【フォルダ】「フォルダ」タブ上部でフォルダを切り替えます。メニューから新規作成でき、フォルダ横の「⋯」で名前の変更・削除・並べ替えができます。1 つの作品を複数のフォルダに入れられます。
 
-【作品メニュー】表紙右上の「⋮」を押すと、完全なタイトルの確認、ID のコピー、フォルダ選択、このフォルダから外す、表紙の再取得、削除ができます。見つからなかった作品はここで「ID を修正」できます。
+【作品メニュー】表紙右上の「⋮」（または「最近追加」の行を長押し）で、完全なタイトルの確認、メモ（ほかの場所をタップで自動保存）、ID のコピー、フォルダ選択、このフォルダから外す、表紙の再取得、削除ができます。見つからなかった作品はここで「ID を修正」できます。
 
 【複数選択】表紙を長押しすると複数選択モードになります。表紙をタップして選択・解除し、下のバーでまとめてフォルダ追加・このフォルダから外す・削除ができます。戻るボタンで終了します。
 
-【開く】表紙をタップするとブラウザでページを開きます。
+【開く】表紙または「最近追加」の行をタップするとページを開きます。設定 → ページの開き方 で外部ブラウザ（既定）かアプリ内ブラウザを選べます。
+
+【ママモード】設定 → ママモード で表紙を灰色の四角にし、タイトルやメモも隠せます。適用するページも選べます。
 
 【バックアップ】設定 → データ → CSV をエクスポートし、共有メニューから保存します。新しい端末でインポートすると、タイトルと表紙を ID から再取得します。
 

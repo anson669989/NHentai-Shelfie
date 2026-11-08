@@ -2,6 +2,7 @@
 // 站方改版時只需要修改這個檔（或在設定頁「進階」修改端點範本）。
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
+import { Browser } from '@capacitor/browser'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { NhWebFetch } from 'nh-webfetch'
 import { AppError, E } from './errors.js'
@@ -700,4 +701,22 @@ export async function onShareReceived(cb) {
   } catch {
     return null
   }
+}
+
+// ---------- 開啟網頁（設定「開啟網頁方式」） ----------
+/**
+ * 以外部瀏覽器（預設）或 App 內瀏覽器（Custom Tab）開啟網址。
+ * 外部瀏覽器跑在自己的工作堆疊，從網頁「分享」回 App 時不會被 singleTask 的 MainActivity 清掉。
+ * url 必須是 galleryPageUrl() 組出的網址；這裡再檢查一次 https 與白名單（外掛 Java 端也會檢查）。
+ * 開不起來時丟出錯誤，由介面改成複製連結。
+ * @param {string} url
+ * @param {'external'|'custom_tab'} mode
+ */
+export async function openInBrowser(url, mode = 'external') {
+  assertAllowed(url)
+  if (mode === 'custom_tab') {
+    await Browser.open({ url })
+    return
+  }
+  await NhWebFetch.openExternal({ url })
 }

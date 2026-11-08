@@ -20,9 +20,10 @@ Capacitor + Vue 3 的 Android App：輸入 gallery ID，背景抓書名與封面
 ## 架構（三層，禁止跨層）
 
 - `src/components/*.vue`：介面層，只呼叫服務層，不直接碰 DB、檔案、網路
+- `src/components/bookActions.js`：「⋮」單本選單（含備註）與開網頁，資料夾頁與新增頁「最近加入」共用，不要各複製一份；`viewOptions.js`（純函式）算顯示備註／媽媽模式
 - `src/services/library.js`：服務層入口，唯一碰 SQLite 與檔案的地方；背景佇列（meta／cover 兩個工作者）也在這裡
 - `src/services/nhSource.js`：**唯一**對 nhentai 發請求與解析的地方；站方改版只改這裡；也是唯一 import `nh-webfetch` 的地方（含接收分享的 `takeSharedText`／`onShareReceived`）。使用 **API v2**（`/api/v2/galleries/{id}`、`/api/v2/cdn`，規格摘要見 `docs/tasks/004-api-v2.md` 第 5 節）；舊 `/api/gallery/{id}` 已停用
-- `plugins/nh-webfetch/`：本地 Capacitor 外掛（Java），獨立隱藏 WebView 過 Cloudflare 後抓 API、驗證畫面、清 cookie；**nh-webfetch 也負責接收分享**（瀏覽器「分享」的 ACTION_SEND 文字；intent-filter 由 `patch-android.mjs` 加到 MainActivity）；`cap sync` 自動納入，不需改 android/
+- `plugins/nh-webfetch/`：本地 Capacitor 外掛（Java），獨立隱藏 WebView 過 Cloudflare 後抓 API、驗證畫面、清 cookie；**nh-webfetch 也負責接收分享**（瀏覽器「分享」的 ACTION_SEND 文字；intent-filter 由 `patch-android.mjs` 加到 MainActivity）與 `openExternal`（以系統瀏覽器開網頁，Java 端再檢查 https＋nhentai 網域；JS 由 nhSource 的 `openInBrowser` 呼叫，依設定 `open_mode` 選外部瀏覽器或 Custom Tab）；`cap sync` 自動納入，不需改 android/
 - `src/services/parse.js`、`csv.js`、`errors.js`、`settingsMigration.js`、`addPlan.js`：純函式，無 I/O，必須有單元測試
 - `src/services/db.js`：連線與 schema 遷移
 - `src/locales.js`：所有介面字串（繁中 zh-TW / 简中 zh-CN / English / 日本語）四份同步，純資料（`tests/locales.test.js` 檢查四語鍵一致）；`src/i18n.js` 只放 `t()`、`errText()` 與語言偵測

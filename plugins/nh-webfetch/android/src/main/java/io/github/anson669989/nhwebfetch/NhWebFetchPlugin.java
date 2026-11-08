@@ -3,6 +3,7 @@ package io.github.anson669989.nhwebfetch;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Dialog;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.graphics.Color;
@@ -167,6 +168,35 @@ public class NhWebFetchPlugin extends Plugin {
     }
 
     // ------------------------------------------------------------------ API
+
+    /**
+     * 以系統瀏覽器開啟網址（設定「開啟網頁方式 → 外部瀏覽器」）。
+     * NEW_TASK：瀏覽器在自己的工作堆疊，從網頁分享回 App 時不會被 singleTask 的 MainActivity 清掉。
+     * 不用 resolveActivity（Android 11 起需要 manifest queries），直接 startActivity 並接 ActivityNotFoundException。
+     */
+    @PluginMethod
+    public void openExternal(PluginCall call) {
+        String url = call.getString("url");
+        if (!isAllowedUrl(url)) {
+            call.reject("url not allowed", "INVALID_URL");
+            return;
+        }
+        main.post(() -> {
+            try {
+                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                intent.addCategory(Intent.CATEGORY_BROWSABLE);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                Activity activity = getActivity();
+                if (activity != null) activity.startActivity(intent);
+                else getContext().startActivity(intent);
+                call.resolve();
+            } catch (ActivityNotFoundException e) {
+                call.reject("no browser", "NO_BROWSER");
+            } catch (Exception e) {
+                call.reject("open failed", "OPEN_FAILED");
+            }
+        });
+    }
 
     @PluginMethod
     public void fetchText(PluginCall call) {

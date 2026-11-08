@@ -269,3 +269,47 @@ details.row[open] { gap: 8px; }
 .recent-name { font-size: 14px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .add-page .folder-pick-row .select-like { flex: 1; min-width: 0; justify-content: flex-start; gap: 2px; }
 .add-page .folder-pick-row .caret { margin-left: auto; }
+
+/* 最近加入：整條可點（開網頁）、長按開「⋮」選單；不可觸發文字選取 */
+.recent-row { cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.recent-row:active { background: var(--surface-2); }
+.recent-name, .recent-line { min-height: 1.35em; } /* 隱藏書名／沒有備註時這一行留白 */
+.recent-line { font-size: 12px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 封面下方的備註：單行，太長截成「…」；沒有備註也保留這一行（每格高度一致） */
+.cover-note {
+  height: 18px; padding: 0 2px; font-size: 11px; line-height: 18px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 媽媽模式：封面換成固定淺灰方塊（不跟主題色、深色模式也一樣），不放 <img> */
+.cover-mama { width: 100%; height: 100%; background: #d4d4d8; }
+.recent-ph.mama { background: #d4d4d8; }
+
+/* ⋮ 選單內的備註輸入框 */
+.sheet-note { display: flex; flex-direction: column; gap: 4px; padding: 0 12px 8px; flex-shrink: 0; }
+.sheet-note-label { font-size: 12px; color: var(--muted); }
+.sheet-note .input { width: 100%; }
+
+/* 設定頁：開關 */
+.switch { position: relative; display: inline-flex; flex-shrink: 0; width: 46px; height: 28px; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.switch-track {
+  width: 100%; height: 100%; border-radius: 14px; background: var(--border); transition: background .15s; pointer-events: none;
+}
+.switch-track::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .3); transition: transform .15s;
+}
+.switch input:checked + .switch-track { background: var(--primary); }
+.switch input:checked + .switch-track::after { transform: translateX(18px); }
+.switch input:disabled { cursor: default; }
+.row.sub { padding-left: 28px; }
+.row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* 媽媽模式詳細設定：總開關關閉時變淡、不能操作 */
+.mama-detail { border: 0; margin: 0; padding: 0; min-width: 0; }
+.mama-detail:disabled { opacity: .45; }
+.group-title {
+  padding: 10px 14px 4px; font-size: 12px; font-weight: 600; color: var(--muted);
+  border-top: 1px solid var(--border); background: var(--surface-2);
+}

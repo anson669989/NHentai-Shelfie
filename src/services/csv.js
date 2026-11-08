@@ -132,7 +132,8 @@ export function validateCsv(text, existingIds = new Set()) {
       result.skipped.push({ line, reason: 'invalid_folder', raw: folderCell })
       return
     }
-    const note = idx.note >= 0 ? unguardFormula(r[idx.note] ?? '').slice(0, 2000) : ''
+    // 備註不限長度（整個檔案受 CSV_MAX_BYTES 限制）
+    const note = idx.note >= 0 ? unguardFormula(r[idx.note] ?? '') : ''
     let addedAt = Math.floor(Date.now() / 1000)
     if (idx.added_at >= 0 && (r[idx.added_at] ?? '').trim()) {
       const t = Date.parse(r[idx.added_at].trim())

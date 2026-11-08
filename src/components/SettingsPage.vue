@@ -44,6 +44,78 @@
             </button>
           </div>
         </div>
+        <div class="row">
+          <span>{{ t('settings.showNote') }}</span>
+          <label class="switch">
+            <input type="checkbox" :checked="on('show_note')" @change="flip('show_note', $event)" />
+            <span class="switch-track" />
+          </label>
+        </div>
+        <div class="row col">
+          <span>{{ t('settings.recentLimit') }}</span>
+          <div class="segmented">
+            <button
+              v-for="n in RECENT_LIMITS"
+              :key="n"
+              :class="{ on: normalizeRecentLimit(settings.recent_limit) === n }"
+              @click="setSetting('recent_limit', n)"
+            >
+              {{ n }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 開啟網頁方式：預設外部瀏覽器（從網頁分享回 App 時原網頁不會消失） -->
+      <h2>{{ t('settings.web') }}</h2>
+      <div class="card">
+        <div class="row col">
+          <span>{{ t('settings.openMode') }}</span>
+          <div class="segmented">
+            <button
+              v-for="m in ['external', 'custom_tab']"
+              :key="m"
+              :class="{ on: (settings.open_mode === 'custom_tab' ? 'custom_tab' : 'external') === m }"
+              @click="setSetting('open_mode', m)"
+            >
+              {{ t('settings.openMode.' + m) }}
+            </button>
+          </div>
+          <span class="muted small">{{ t('settings.openModeHint') }}</span>
+        </div>
+      </div>
+
+      <!-- 媽媽模式：只能在這裡切換 -->
+      <h2>{{ t('settings.mama') }}</h2>
+      <div class="card">
+        <div class="row">
+          <div class="row-text">
+            <span>{{ t('settings.mama') }}</span>
+            <span class="muted small">{{ t('settings.mamaHint') }}</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" :checked="on('mama_mode')" @change="flip('mama_mode', $event)" />
+            <span class="switch-track" />
+          </label>
+        </div>
+        <fieldset class="mama-detail" :disabled="!on('mama_mode')">
+          <div class="group-title">{{ t('settings.mamaScope') }}</div>
+          <div v-for="k in ['library', 'add']" :key="k" class="row sub">
+            <span>{{ t('settings.mamaScope.' + k) }}</span>
+            <label class="switch">
+              <input type="checkbox" :checked="on('mama_scope_' + k)" @change="flip('mama_scope_' + k, $event)" />
+              <span class="switch-track" />
+            </label>
+          </div>
+          <div class="group-title">{{ t('settings.mamaHide') }}</div>
+          <div v-for="k in ['cover', 'title', 'note']" :key="k" class="row sub">
+            <span>{{ t('settings.mamaHide.' + k) }}</span>
+            <label class="switch">
+              <input type="checkbox" :checked="on('mama_hide_' + k)" @change="flip('mama_hide_' + k, $event)" />
+              <span class="switch-track" />
+            </label>
+          </div>
+        </fieldset>
       </div>
 
       <!-- 語言 -->
@@ -177,7 +249,7 @@ import {
   verifyChallenge,
   resetVerification,
 } from '../services/library.js'
-import { validateEndpointTemplate } from '../services/parse.js'
+import { validateEndpointTemplate, RECENT_LIMITS, normalizeRecentLimit } from '../services/parse.js'
 import { AppError, E, toAppError } from '../services/errors.js'
 import { t, errText, LANGUAGES, currentLang } from '../i18n.js'
 import { alertDialog, confirmDialog, toast, formatBytes } from '../ui.js'
@@ -196,6 +268,9 @@ const logText = ref('')
 const version = ref('')
 const ep = reactive({ ...DEFAULT_ENDPOINTS })
 const devMode = computed(() => settings.dev_mode === '1')
+/** 開關型設定：'1' / '0' */
+const on = (key) => settings[key] === '1'
+const flip = (key, ev) => setSetting(key, ev.target.checked ? '1' : '0')
 
 const lastExportText = computed(() => {
   const s = Number(settings.last_export_at)

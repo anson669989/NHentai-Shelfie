@@ -47,15 +47,32 @@
       <div class="add-inner">
         <h3 class="recent-title">{{ t('add.recent') }}</h3>
         <p v-if="!recent.length" class="add-empty muted">{{ t('add.hint') }}</p>
+        <!-- 點整條開網頁；長按開「⋮」單本選單（與資料夾頁同一個） -->
         <ul v-else class="recent-list">
-          <li v-for="b in recent" :key="b.gallery_id" class="recent-row">
-            <img v-if="b.cover_path && !broken[b.gallery_id]" :src="coverSrc(b)" alt="" @error="broken[b.gallery_id] = true" />
+          <li
+            v-for="b in recent"
+            :key="b.gallery_id"
+            v-longpress="() => openBookMenu(b)"
+            class="recent-row"
+            @click="openBook(b)"
+          >
+            <!-- 媽媽模式：有封面的書只放淺灰方塊，不載入圖片 -->
+            <div v-if="view.hideCover && b.cover_path" class="recent-ph mama" />
+            <img
+              v-else-if="b.cover_path && !broken[b.gallery_id]"
+              :src="coverSrc(b)"
+              alt=""
+              draggable="false"
+              @error="broken[b.gallery_id] = true"
+            />
             <div v-else class="recent-ph" :class="{ loading: isLoadingStatus(b) }" />
             <div class="recent-info">
               <div class="muted small">#{{ b.gallery_id }}</div>
-              <div v-if="b.title" class="recent-name">{{ b.title }}</div>
+              <div v-if="b.title" class="recent-name">{{ view.hideTitle ? '' : b.title }}</div>
               <div v-else class="recent-name muted">{{ t(statusKey(b)) }}</div>
               <div v-if="b.title && b.fetch_status !== 'ok'" class="muted small">{{ t(statusKey(b)) }}</div>
+              <div class="recent-line muted">📁 {{ b.folders.length ? b.folders.join('、') : t('folder.uncat') }}</div>
+              <div v-if="view.showNote" class="recent-line muted">{{ view.hideNote ? '' : b.note || '' }}</div>
             </div>
           </li>
         </ul>
@@ -83,6 +100,8 @@ import { settings, setSetting } from '../services/settings.js'
 import { t, errText } from '../i18n.js'
 import { checklistDialog, promptDialog, toast } from '../ui.js'
 import { statusKey, isLoadingStatus } from './bookStatus.js'
+import { openBook, openBookMenu } from './bookActions.js'
+import { viewOptions } from './viewOptions.js'
 
 const props = defineProps({ active: Boolean })
 
@@ -95,6 +114,8 @@ const selected = ref([])
 const recent = ref([])
 const broken = reactive({})
 
+/** 顯示備註與媽媽模式（最近加入） */
+const view = computed(() => viewOptions(settings, 'add'))
 const parsedId = computed(() => parseGalleryId(raw.value))
 const selectedNames = computed(() =>
   folders.value
@@ -118,12 +139,12 @@ async function loadFolders() {
 }
 
 async function loadRecent() {
-  recent.value = await listRecentBooks(20)
+  recent.value = await listRecentBooks(settings.recent_limit)
   for (const k of Object.keys(broken)) delete broken[k]
 }
 
 watch(
-  () => [props.active, dataVersion.value],
+  () => [props.active, dataVersion.value, settings.recent_limit],
   ([active]) => {
     if (!active) return
     loadFolders().catch(() => {})

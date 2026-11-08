@@ -6,6 +6,7 @@
 // NhWebFetch.showChallenge({ url })         → { passed: boolean }
 // NhWebFetch.clearSession()                 → {}
 // NhWebFetch.takeSharedText()               → { text }：取出並清除瀏覽器「分享」進來的文字（沒有時為 ''）
+// NhWebFetch.openExternal({ url })         → {}：以系統瀏覽器開啟（只接受 https + nhentai 網域；沒有瀏覽器時 reject NO_BROWSER）
 // NhWebFetch.addListener('shareReceived')   ：App 已在背景時收到新的分享（之後呼叫 takeSharedText 取出）
 import { registerPlugin } from '@capacitor/core'
 

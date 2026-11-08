@@ -25,6 +25,15 @@ export const DEFAULTS = Object.freeze({
   cdn_last_host: '', // 上次成功下載封面的主機（例 https://t1.nhentai.net），下次優先用
   settings_rev: '0', // 一次性設定遷移的版本（見 migrateSettings）
   dev_mode: '0', // 1 = 顯示開發者選項（關於 → 版本 連點 7 次切換）
+  open_mode: 'external', // 開網頁方式：external（系統瀏覽器）| custom_tab（App 內瀏覽器）
+  show_note: '0', // 1 = 封面下方顯示備註
+  recent_limit: '20', // 新增頁「最近加入」筆數：10 | 20 | 30 | 40 | 50
+  mama_mode: '0', // 媽媽模式總開關（只能在設定頁切換）
+  mama_scope_library: '1', // 套用到收藏頁封面牆
+  mama_scope_add: '1', // 套用到新增頁「最近加入」
+  mama_hide_cover: '1', // 隱藏封面（淺灰方塊，不載入圖片）
+  mama_hide_title: '0', // 隱藏書名
+  mama_hide_note: '0', // 隱藏備註
   ...DEFAULT_ENDPOINTS,
 })
 

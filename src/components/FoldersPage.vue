@@ -32,6 +32,7 @@
       :columns="Number(settings.grid_columns) || 3"
       :selecting="selecting"
       :selected-ids="selected"
+      v-bind="view"
       @open="openBook"
       @longpress="startSelect"
       @toggle="toggle"
@@ -55,7 +56,6 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Browser } from '@capacitor/browser'
 import CoverGrid from './CoverGrid.vue'
 import QueueBanner from './QueueBanner.vue'
 import {
@@ -70,21 +70,15 @@ import {
   renameFolder,
   deleteFolder,
   moveFolder,
-  getBookFolders,
-  getBookTitles,
   addBooksToFolders,
-  setBookFolders,
   removeBooksFromFolder,
   deleteBooks,
-  requeueBook,
-  changeBookId,
-  openUrlFor,
 } from '../services/library.js'
-import { parseGalleryId } from '../services/parse.js'
-import { AppError, E } from '../services/errors.js'
 import { settings } from '../services/settings.js'
 import { t, errText } from '../i18n.js'
-import { actionSheet, confirmDialog, promptDialog, checklistDialog, toast, pushBackHandler } from '../ui.js'
+import { actionSheet, confirmDialog, promptDialog, toast, pushBackHandler } from '../ui.js'
+import { openBook, openBookMenu, pickFoldersDialog } from './bookActions.js'
+import { viewOptions } from './viewOptions.js'
 
 const props = defineProps({ active: Boolean })
 
@@ -111,6 +105,8 @@ const currentName = computed(() =>
   current.value === 'all' ? t('folder.all') : current.value === 'uncat' ? t('folder.uncat') : currentFolder.value?.name || '',
 )
 const currentCount = computed(() => countOf(current.value))
+/** 顯示備註與媽媽模式（收藏頁） */
+const view = computed(() => viewOptions(settings, 'library'))
 const allSelected = computed(() => books.value.length > 0 && selected.value.size === books.value.length)
 
 async function reload() {
@@ -164,24 +160,6 @@ function exitSelect() {
   selected.value = new Set()
   removeBack?.()
   removeBack = null
-}
-
-async function pickFoldersDialog(title, items, preselected = []) {
-  return checklistDialog(title, items, preselected, {
-    extraAction: {
-      label: '＋ ' + t('folder.new'),
-      run: async () => {
-        let id = null
-        const name = await promptDialog(t('folder.new'), {
-          placeholder: t('folder.namePlaceholder'),
-          validate: async (v) => {
-            id = await createFolder(v)
-          },
-        })
-        return name != null && id ? { label: name.trim(), value: id } : null
-      },
-    },
-  })
 }
 
 async function batchClassify() {
@@ -309,96 +287,8 @@ async function folderMenu(f) {
   return true
 }
 
-// ---- 單本 ----
-async function openBook(book) {
-  let url
-  try {
-    url = openUrlFor(book.gallery_id)
-    await Browser.open({ url })
-  } catch (err) {
-    if (!url) {
-      toast(errText(err))
-      return
-    }
-    try {
-      await navigator.clipboard.writeText(url)
-    } catch {
-      /* ignore */
-    }
-    toast(t('common.copied'))
-  }
-}
-
-async function copyId(id) {
-  try {
-    await navigator.clipboard.writeText(String(id))
-    toast(t('book.idCopied', { id }))
-  } catch {
-    toast(t('common.copyFailed'))
-  }
-}
-
-/** 封面右上角「⋮」：完整標題＋單本功能 */
-async function bookMenu(book) {
-  const id = book.gallery_id
-  let titles = { english: '', japanese: '', pretty: book.title }
-  try {
-    titles = await getBookTitles(id)
-  } catch {
-    /* 讀不到就只顯示簡短標題 */
-  }
-  const lines = [titles.english || titles.pretty, titles.japanese].filter((v, i, a) => v && a.indexOf(v) === i)
-  const notFound = book.fetch_status === 'not_found'
-  const f = currentFolder.value
-  const action = await actionSheet(
-    `#${id}`,
-    [
-      { label: t('book.copyId'), value: 'copy' },
-      ...(notFound ? [{ label: t('book.changeId'), value: 'changeId' }] : [{ label: t('book.open'), value: 'open' }]),
-      { label: t('book.classify'), value: 'folders' },
-      ...(f ? [{ label: t('book.removeFromFolder', { name: f.name }), value: 'remove' }] : []),
-      ...(notFound ? [] : [{ label: t('book.refetch'), value: 'refetch' }]),
-      { label: t('book.delete'), value: 'delete', danger: true },
-    ],
-    { lines },
-  )
-  try {
-    if (action === 'copy') await copyId(id)
-    else if (action === 'open') await openBook(book)
-    else if (action === 'changeId') await changeId(book)
-    else if (action === 'folders') {
-      const before = (await getBookFolders(id)).map((x) => x.id)
-      const picked = await pickFoldersDialog(
-        t('book.classify'),
-        folders.value.map((x) => ({ label: x.name, value: x.id })),
-        before,
-      )
-      if (picked) await setBookFolders(id, picked)
-    } else if (action === 'remove') {
-      await removeBooksFromFolder([id], f.id)
-      toast(t('select.removed', { n: 1 }))
-    } else if (action === 'refetch') {
-      await requeueBook(id)
-      toast(t('book.requeued'))
-    } else if (action === 'delete') {
-      const ok = await confirmDialog(t('book.deleteConfirm', { id }), { okText: t('common.delete'), danger: true })
-      if (ok) await deleteBooks([id])
-    }
-  } catch (err) {
-    toast(errText(err))
-  }
-}
-
-async function changeId(book) {
-  await promptDialog(t('book.changeId'), {
-    value: String(book.gallery_id),
-    placeholder: t('add.placeholder'),
-    maxlength: 60,
-    validate: async (v) => {
-      const n = parseGalleryId(v)
-      if (!n) throw new AppError(E.INVALID_ID)
-      await changeBookId(book.gallery_id, n)
-    },
-  })
+// ---- 單本（選單與開網頁與新增頁共用 bookActions.js） ----
+function bookMenu(book) {
+  return openBookMenu(book, { currentFolder: currentFolder.value })
 }
 </script>

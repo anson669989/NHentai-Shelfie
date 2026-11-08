@@ -61,12 +61,13 @@ export const promptDialog = (title, { value = '', placeholder = '', maxlength = 
  * 每列可帶：danger（紅字）、checked（列尾勾號）、more（右側「⋯」按鈕，點它 resolve { more: value }）；
  * `{ divider: true }` 為分隔線。
  * @param {{label?:string, value?:any, danger?:boolean, checked?:boolean, more?:boolean, divider?:boolean}[]} actions
- * @param {{tall?:boolean, lines?:string[]}} [opts] tall：最大高度 70vh、可捲動（長清單用）；
- *   lines：標題下方的純文字行（例如完整書名），可選取複製
+ * @param {{tall?:boolean, lines?:string[], note?:{value:string, label?:string, placeholder?:string, save?:(v:string)=>any}}} [opts]
+ *   tall：最大高度 70vh、可捲動（長清單用）；lines：標題下方的純文字行（例如完整書名），可選取複製；
+ *   note：單行備註輸入框（直接改 note.value；離開輸入框時呼叫 note.save；貼上的換行轉成空白）
  * @returns {Promise<any|{more:any}|false>}
  */
-export const actionSheet = (title, actions, { tall = false, lines = [] } = {}) =>
-  open('sheet', { title, actions, tall, lines: lines.filter(Boolean) })
+export const actionSheet = (title, actions, { tall = false, lines = [], note = null } = {}) =>
+  open('sheet', { title, actions, tall, lines: lines.filter(Boolean), note })
 
 /**
  * 多選清單

@@ -57,6 +57,7 @@ vi.mock('@capacitor/core', () => ({
   CapacitorHttp: { get: vi.fn(), request: vi.fn(async () => ({ status: 200, headers: {} })) },
 }))
 vi.mock('@capacitor/app', () => ({ App: { getInfo: async () => ({ version: '0.1.1' }) } }))
+vi.mock('@capacitor/browser', () => ({ Browser: { open: async () => {} } }))
 vi.mock('nh-webfetch', () => ({ NhWebFetch: {} }))
 vi.mock('../src/services/settings.js', () => ({
   settings,

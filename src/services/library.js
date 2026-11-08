@@ -5,7 +5,14 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
 import { initDb, query, run, transaction } from './db.js'
 import { AppError, E, toAppError } from './errors.js'
-import { classifyDownloadError, extractGalleryId, normalizeFolderName, parseGallery } from './parse.js'
+import {
+  classifyDownloadError,
+  extractGalleryId,
+  normalizeFolderName,
+  normalizeNote,
+  normalizeRecentLimit,
+  parseGallery,
+} from './parse.js'
 import { planAdd } from './addPlan.js'
 import { buildCsv, validateCsv, CSV_MAX_BYTES } from './csv.js'
 import { loadSettings, migrateSettings, setSetting, settings } from './settings.js'
@@ -22,6 +29,7 @@ import {
   getLastCoverTrace,
   takeSharedText,
   onShareReceived,
+  openInBrowser,
 } from './nhSource.js'
 
 const COVERS_DIR = 'covers'
@@ -145,7 +153,7 @@ const SORT_SQL = {
 }
 export const SORT_MODES = Object.keys(SORT_SQL)
 
-const LIST_COLS = 'b.gallery_id, b.title, b.cover_path, b.cover_rev, b.fetch_status'
+const LIST_COLS = 'b.gallery_id, b.title, b.note, b.cover_path, b.cover_rev, b.fetch_status'
 
 /**
  * 列表查詢只取顯示欄位（raw_json 在獨立的 book_raw 表）。
@@ -164,11 +172,40 @@ export async function listBooks(folderKey, sortMode) {
   )
 }
 
-/** 加入頁「最近加入」：只取顯示欄位 */
+/**
+ * 加入頁「最近加入」：只取顯示欄位，另附所在資料夾名稱（folders: string[]，依資料夾順序）。
+ * @param {number|string} limit 10／20／30／40／50（其他值視為 20）
+ */
 export async function listRecentBooks(limit = 20) {
-  return query(`SELECT ${LIST_COLS} FROM books b ORDER BY ${SORT_SQL.added_desc} LIMIT ?`, [
-    Math.max(1, Math.min(100, Math.trunc(limit))),
-  ])
+  const rows = await query(
+    `SELECT ${LIST_COLS},
+       (SELECT group_concat(name, char(31)) FROM (
+          SELECT f.name FROM book_folders bf JOIN folders f ON f.id = bf.folder_id
+          WHERE bf.gallery_id = b.gallery_id ORDER BY f.sort_order, f.id)) AS folder_names
+     FROM books b ORDER BY ${SORT_SQL.added_desc} LIMIT ?`,
+    [normalizeRecentLimit(limit)],
+  )
+  return rows.map(({ folder_names, ...b }) => ({ ...b, folders: folder_names ? String(folder_names).split(FOLDER_SEP) : [] }))
+}
+const FOLDER_SEP = String.fromCharCode(31)
+
+/**
+ * ⋮ 單本選單的備註：單行、不限長度；換行轉空白、去頭尾空白，空字串存成空值。
+ * 內容沒變就不寫。回傳整理後的備註（null＝沒有備註）。
+ */
+export async function setNote(galleryId, text) {
+  const id = Number(galleryId)
+  const note = normalizeNote(text)
+  const book = await getBook(id)
+  if (!book) return note
+  if ((book.note ?? null) === note) return note
+  try {
+    await run('UPDATE books SET note = ? WHERE gallery_id = ?', [note, id])
+  } catch (err) {
+    throw dbError(err)
+  }
+  bump()
+  return note
 }
 
 /** 背景佇列的排隊順序：毫秒時間，保證遞增 */
@@ -418,6 +455,11 @@ async function localCoverMeta(id) {
 
 export function openUrlFor(id) {
   return galleryPageUrl(id)
+}
+
+/** 依設定「開啟網頁方式」開啟該本網頁；開不起來時丟錯，介面改成複製連結 */
+export async function openBookPage(id) {
+  await openInBrowser(galleryPageUrl(id), settings.open_mode === 'custom_tab' ? 'custom_tab' : 'external')
 }
 
 // ================= 資料夾 =================
