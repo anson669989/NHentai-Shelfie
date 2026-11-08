@@ -503,17 +503,30 @@ export async function deleteFolder(id) {
   bump()
 }
 
-/** dir = -1 往上、+1 往下 */
-export async function moveFolder(id, dir) {
+/**
+ * 依拖曳結果重排資料夾：ids 為新的順序。一個交易更新所有 sort_order，失敗整批回滾。
+ * 清單中沒列到的資料夾（例如拖曳時別處新增的）接在後面，維持原本相對順序。
+ */
+export async function reorderFolders(ids) {
   const list = await listFolders()
-  const i = list.findIndex((f) => f.id === Number(id))
-  const j = i + dir
-  if (i < 0 || j < 0 || j >= list.length) return
-  ;[list[i], list[j]] = [list[j], list[i]]
-  await transaction(
-    list.map((f, idx) => ({ statement: 'UPDATE folders SET sort_order = ? WHERE id = ?', values: [idx + 1, f.id] })),
-  )
-  bump()
+  const known = new Set(list.map((f) => f.id))
+  const seen = new Set()
+  const order = []
+  for (const raw of ids) {
+    const id = Number(raw)
+    if (Number.isInteger(id) && known.has(id) && !seen.has(id)) {
+      seen.add(id)
+      order.push(id)
+    }
+  }
+  for (const f of list) if (!seen.has(f.id)) order.push(f.id)
+  try {
+    await transaction(
+      order.map((id, idx) => ({ statement: 'UPDATE folders SET sort_order = ? WHERE id = ?', values: [idx + 1, id] })),
+    )
+  } finally {
+    bump() // 失敗時也通知，讓畫面重新讀回資料庫裡的順序
+  }
 }
 
 export async function getSortMode(folderKey) {

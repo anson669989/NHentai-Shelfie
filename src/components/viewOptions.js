@@ -11,5 +11,7 @@ export function viewOptions(settings, scope) {
     hideCover: mama && settings.mama_hide_cover === '1',
     hideTitle: mama && settings.mama_hide_title === '1',
     hideNote: mama && settings.mama_hide_note === '1',
+    // 最近加入：媽媽模式套用到新增頁時，自動隱藏每本書所在的資料夾
+    hideFolders: mama && scope === 'add',
   }
 }

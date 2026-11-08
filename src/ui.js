@@ -58,16 +58,18 @@ export const promptDialog = (title, { value = '', placeholder = '', maxlength = 
 
 /**
  * 動作選單
- * 每列可帶：danger（紅字）、checked（列尾勾號）、more（右側「⋯」按鈕，點它 resolve { more: value }）；
+ * 每列可帶：danger（紅字）、checked（列尾勾號）、more（右側「⋯」按鈕，點它 resolve { more: value }）、
+ *   drag（左側 ≡ 拖曳把手，需搭配 more；可拖的列要相鄰）；
  * `{ divider: true }` 為分隔線。
  * @param {{label?:string, value?:any, danger?:boolean, checked?:boolean, more?:boolean, divider?:boolean}[]} actions
- * @param {{tall?:boolean, lines?:string[], note?:{value:string, label?:string, placeholder?:string, save?:(v:string)=>any}}} [opts]
+ * @param {{tall?:boolean, lines?:string[], note?:{value:string, label?:string, placeholder?:string, save?:(v:string)=>any}, onReorder?:(values:any[])=>any}} [opts]
  *   tall：最大高度 70vh、可捲動（長清單用）；lines：標題下方的純文字行（例如完整書名），可選取複製；
  *   note：單行備註輸入框（直接改 note.value；離開輸入框時呼叫 note.save；貼上的換行轉成空白）
+ *   onReorder：拖曳放開後以新順序的 value 陣列呼叫；回傳的 Promise 失敗時畫面還原、顯示錯誤
  * @returns {Promise<any|{more:any}|false>}
  */
-export const actionSheet = (title, actions, { tall = false, lines = [], note = null } = {}) =>
-  open('sheet', { title, actions, tall, lines: lines.filter(Boolean), note })
+export const actionSheet = (title, actions, { tall = false, lines = [], note = null, onReorder = null } = {}) =>
+  open('sheet', { title, actions, tall, lines: lines.filter(Boolean), note, onReorder })
 
 /**
  * 多選清單

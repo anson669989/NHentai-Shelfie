@@ -236,6 +236,18 @@ details.row[open] { gap: 8px; }
 .sheet-row .sheet-item { flex: 1; min-width: 0; }
 .sheet-more { border: 0; background: none; color: var(--muted); font-size: 20px; width: 48px; align-self: stretch; border-radius: 10px; }
 .sheet-more:active { background: var(--surface-2); }
+/* 資料夾拖曳排序：只有按住 ≡ 才拖（touch-action: none 讓把手不觸發捲動） */
+.drag-handle {
+  flex-shrink: 0; width: 40px; align-self: stretch; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 20px; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+}
+.sheet-row.drag-shift { transition: transform .15s ease; }
+.sheet-row.drag-lifted {
+  position: relative; z-index: 2; background: var(--surface); border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
+}
+.sheet.drag-active { user-select: none; -webkit-user-select: none; }
+.sheet.drag-active .drag-handle { cursor: grabbing; }
 .sheet-divider { border: 0; border-top: 1px solid var(--border); margin: 4px 8px; flex-shrink: 0; }
 .sheet-item:active { background: var(--surface-2); }
 .sheet-item.danger { color: var(--error); }
@@ -309,6 +321,8 @@ details.row[open] { gap: 8px; }
 /* 媽媽模式詳細設定：總開關關閉時變淡、不能操作 */
 .mama-detail { border: 0; margin: 0; padding: 0; min-width: 0; }
 .mama-detail:disabled { opacity: .45; }
+.detail-toggle { width: 100%; border: 0; border-top: 1px solid var(--border); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.detail-toggle:active { background: var(--surface-2); }
 .group-title {
   padding: 10px 14px 4px; font-size: 12px; font-weight: 600; color: var(--muted);
   border-top: 1px solid var(--border); background: var(--surface-2);

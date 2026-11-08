@@ -71,7 +71,7 @@
               <div v-if="b.title" class="recent-name">{{ view.hideTitle ? '' : b.title }}</div>
               <div v-else class="recent-name muted">{{ t(statusKey(b)) }}</div>
               <div v-if="b.title && b.fetch_status !== 'ok'" class="muted small">{{ t(statusKey(b)) }}</div>
-              <div class="recent-line muted">📁 {{ b.folders.length ? b.folders.join('、') : t('folder.uncat') }}</div>
+              <div v-if="!view.hideFolders" class="recent-line muted">📁 {{ b.folders.length ? b.folders.join('、') : t('folder.uncat') }}</div>
               <div v-if="view.showNote" class="recent-line muted">{{ view.hideNote ? '' : b.note || '' }}</div>
             </div>
           </li>

@@ -69,7 +69,7 @@ import {
   createFolder,
   renameFolder,
   deleteFolder,
-  moveFolder,
+  reorderFolders,
   addBooksToFolders,
   removeBooksFromFolder,
   deleteBooks,
@@ -217,11 +217,11 @@ async function openPicker() {
       row('all', t('folder.all')),
       row('uncat', t('folder.uncat')),
       { divider: true },
-      ...folders.value.map((f) => ({ ...row(f.id, f.name), more: true })),
+      ...folders.value.map((f) => ({ ...row(f.id, f.name), more: true, drag: true })),
       ...(folders.value.length ? [{ divider: true }] : []),
       { label: '＋ ' + t('folder.new'), value: '__new' },
     ],
-    { tall: true },
+    { tall: true, onReorder: (ids) => reorderFolders(ids) }, // 按住 ≡ 拖曳排序，放開才寫入
   )
   if (action === false || action == null) return
   if (action === '__new') return newFolder()
@@ -256,11 +256,8 @@ async function newFolder() {
 }
 
 async function folderMenu(f) {
-  const idx = folders.value.findIndex((x) => x.id === f.id)
   const action = await actionSheet(f.name, [
     { label: t('folder.rename'), value: 'rename' },
-    ...(idx > 0 ? [{ label: t('folder.moveUp'), value: 'up' }] : []),
-    ...(idx < folders.value.length - 1 ? [{ label: t('folder.moveDown'), value: 'down' }] : []),
     { label: t('folder.delete'), value: 'delete', danger: true },
   ])
   if (!action) return false
@@ -271,9 +268,7 @@ async function folderMenu(f) {
         placeholder: t('folder.namePlaceholder'),
         validate: (v) => renameFolder(f.id, v),
       })
-    } else if (action === 'up') await moveFolder(f.id, -1)
-    else if (action === 'down') await moveFolder(f.id, 1)
-    else if (action === 'delete') {
+    } else if (action === 'delete') {
       const ok = await confirmDialog(t('folder.deleteConfirm', { name: f.name }), {
         okText: t('common.delete'),
         danger: true,

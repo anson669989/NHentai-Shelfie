@@ -61,7 +61,16 @@
         </label>
         <template v-for="(a, i) in d.actions" :key="i">
           <hr v-if="a.divider" class="sheet-divider" />
-          <div v-else-if="a.more" class="sheet-row">
+          <div v-else-if="a.more" class="sheet-row" :data-drag="a.drag ? '' : null">
+            <span
+              v-if="a.drag"
+              class="drag-handle"
+              role="button"
+              :aria-label="t('folder.dragHandle')"
+              @pointerdown="onDragStart($event, d)"
+              @contextmenu.prevent
+              >≡</span
+            >
             <button class="sheet-item" :class="{ danger: a.danger }" @click="closeDialog(d, a.value)">
               <span class="sheet-label">{{ a.label }}</span>
               <span v-if="a.checked" class="sheet-check">✓</span>
@@ -105,6 +114,33 @@ import { nextTick } from 'vue'
 import { ui, closeDialog, toast } from '../ui.js'
 import { t, errText } from '../i18n.js'
 import { singleLine } from '../services/parse.js'
+import { startDragSort, moveItem } from './dragSort.js'
+
+/** 動作選單裡可拖曳的列（a.drag）：按住 ≡ 拖曳，放開後先改畫面，再交給 d.onReorder 寫入；失敗就還原 */
+function onDragStart(e, d) {
+  const container = e.currentTarget.closest('.sheet')
+  const rows = [...container.querySelectorAll('[data-drag]')]
+  const from = rows.indexOf(e.currentTarget.closest('[data-drag]'))
+  startDragSort(e, {
+    container,
+    rows,
+    from,
+    onDrop: (f, to) => {
+      const before = d.actions.slice()
+      const slots = d.actions.map((a, i) => (a.drag ? i : -1)).filter((i) => i >= 0)
+      const moved = moveItem(
+        slots.map((i) => d.actions[i]),
+        f,
+        to,
+      )
+      slots.forEach((ai, k) => (d.actions[ai] = moved[k]))
+      Promise.resolve(d.onReorder?.(moved.map((a) => a.value))).catch((err) => {
+        d.actions.splice(0, d.actions.length, ...before) // 寫入失敗：畫面還原成原本的順序
+        toast(errText(err))
+      })
+    },
+  })
+}
 
 /** 貼上多行文字到單行備註：換行轉空白後插入游標位置 */
 function onNotePaste(e, d) {

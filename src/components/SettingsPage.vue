@@ -98,7 +98,12 @@
             <span class="switch-track" />
           </label>
         </div>
-        <fieldset class="mama-detail" :disabled="!on('mama_mode')">
+        <!-- 詳細設定：預設收合，點了才展開（減少佔用畫面） -->
+        <button class="row detail-toggle" type="button" :aria-expanded="mamaDetailOpen" @click="mamaDetailOpen = !mamaDetailOpen">
+          <span>{{ t('settings.mamaDetail') }}</span>
+          <span class="caret muted">{{ mamaDetailOpen ? '▾' : '▸' }}</span>
+        </button>
+        <fieldset v-if="mamaDetailOpen" class="mama-detail" :disabled="!on('mama_mode')">
           <div class="group-title">{{ t('settings.mamaScope') }}</div>
           <div v-for="k in ['library', 'add']" :key="k" class="row sub">
             <span>{{ t('settings.mamaScope.' + k) }}</span>
@@ -255,6 +260,8 @@ import { t, errText, LANGUAGES, currentLang } from '../i18n.js'
 import { alertDialog, confirmDialog, toast, formatBytes } from '../ui.js'
 
 const props = defineProps({ active: Boolean })
+/** 媽媽模式「詳細設定」是否展開（不記住，每次進設定頁都收合） */
+const mamaDetailOpen = ref(false)
 
 const THEME_COLORS = ['#ed2553', '#e91e63', '#7c4dff', '#3f51b5', '#039be5', '#009688', '#43a047', '#ff9800', '#607d8b']
 

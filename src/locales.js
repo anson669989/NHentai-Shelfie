@@ -11,10 +11,9 @@ const zhTW = {
   'folder.namePlaceholder': '資料夾名稱（1–30 字）',
   'folder.rename': '改名',
   'folder.delete': '刪除資料夾',
-  'folder.moveUp': '往上移',
-  'folder.moveDown': '往下移',
   'folder.pick': '選擇資料夾',
   'folder.more': '更多動作',
+  'folder.dragHandle': '按住拖曳調整順序',
   'folder.deleteConfirm': '刪除資料夾「{name}」？\n裡面的書不會被刪除，沒有其他資料夾的書會回到「未分類」。',
   'folder.empty': '這裡還沒有書',
   'folder.emptyHint': '到「新增」分頁輸入 ID 開始收藏',
@@ -169,9 +168,10 @@ const zhTW = {
   'settings.openModeHint': "用外部瀏覽器時，從網頁「分享」回 App 後原本的網頁還在；App 內瀏覽器會在分享時被關掉。",
   'settings.mama': "媽媽模式",
   'settings.mamaHint': "旁人看到螢幕時不尷尬。點「⋮」打開的選單照常顯示。",
+  'settings.mamaDetail': "詳細設定",
   'settings.mamaScope': "套用頁面",
   'settings.mamaScope.library': "資料夾頁（封面牆）",
-  'settings.mamaScope.add': "新增頁「最近加入」",
+  'settings.mamaScope.add': "新增頁「最近加入」（一併隱藏所在資料夾）",
   'settings.mamaHide': "隱藏內容",
   'settings.mamaHide.cover': "封面",
   'settings.mamaHide.title': "書名",
@@ -180,7 +180,7 @@ const zhTW = {
 
 【從瀏覽器分享】在 nhentai 頁面按 Android 的「分享」，選 NH Shelfie，ID 會自動填好，按「加入」即可。
 
-【分類】在「資料夾」分頁上方切換資料夾；選單內可新增資料夾，按資料夾旁的「⋯」可改名、刪除或調整順序。一本書可以放在多個資料夾。
+【分類】在「資料夾」分頁上方切換資料夾；選單內可新增資料夾，按住資料夾左邊的「≡」拖曳可調整順序，按旁邊的「⋯」可改名或刪除。一本書可以放在多個資料夾。
 
 【單本選單】點封面右上角的「⋮」（或在「最近加入」長按一本）：查看完整標題、寫備註（點旁邊空白處自動儲存）、複製 ID、分類、從此資料夾移除、重抓封面、刪除。找不到的書可以在這裡「修改 ID」。
 
@@ -207,10 +207,9 @@ const zhCN = {
   'folder.namePlaceholder': '文件夹名称（1–30 字）',
   'folder.rename': '重命名',
   'folder.delete': '删除文件夹',
-  'folder.moveUp': '上移',
-  'folder.moveDown': '下移',
   'folder.pick': '选择文件夹',
   'folder.more': '更多操作',
+  'folder.dragHandle': '按住拖动调整顺序',
   'folder.deleteConfirm': '删除文件夹“{name}”？\n里面的本子不会被删除，不在其他文件夹的本子会回到“未分类”。',
   'folder.empty': '这里还没有本子',
   'folder.emptyHint': '到“添加”页输入 ID 开始收藏',
@@ -365,9 +364,10 @@ const zhCN = {
   'settings.openModeHint': "用外部浏览器时，从网页“分享”回 App 后原来的网页还在；App 内浏览器会在分享时被关掉。",
   'settings.mama': "妈妈模式",
   'settings.mamaHint': "旁人看到屏幕时不尴尬。点“⋮”打开的菜单照常显示。",
+  'settings.mamaDetail': "详细设置",
   'settings.mamaScope': "应用页面",
   'settings.mamaScope.library': "文件夹页（封面墙）",
-  'settings.mamaScope.add': "添加页“最近添加”",
+  'settings.mamaScope.add': "添加页“最近添加”（同时隐藏所在文件夹）",
   'settings.mamaHide': "隐藏内容",
   'settings.mamaHide.cover': "封面",
   'settings.mamaHide.title': "标题",
@@ -376,7 +376,7 @@ const zhCN = {
 
 【从浏览器分享】在 nhentai 页面点 Android 的“分享”，选择 NH Shelfie，ID 会自动填好，点“添加”即可。
 
-【分类】在“文件夹”页顶部切换文件夹；菜单里可以新建文件夹，点文件夹旁的“⋯”可以重命名、删除或调整顺序。一本可以放进多个文件夹。
+【分类】在“文件夹”页顶部切换文件夹；菜单里可以新建文件夹，按住文件夹左边的“≡”拖动可以调整顺序，点旁边的“⋯”可以重命名或删除。一本可以放进多个文件夹。
 
 【单本菜单】点封面右上角的“⋮”（或在“最近添加”长按一本）：查看完整标题、写备注（点旁边空白处自动保存）、复制 ID、分类、从此文件夹移除、重新获取封面、删除。找不到的本子可以在这里“修改 ID”。
 
@@ -403,10 +403,9 @@ const en = {
   'folder.namePlaceholder': 'Folder name (1–30 chars)',
   'folder.rename': 'Rename',
   'folder.delete': 'Delete folder',
-  'folder.moveUp': 'Move up',
-  'folder.moveDown': 'Move down',
   'folder.pick': 'Choose folder',
   'folder.more': 'More actions',
+  'folder.dragHandle': 'Hold and drag to reorder',
   'folder.deleteConfirm': 'Delete folder "{name}"?\nBooks are kept; books without any folder go to "Uncategorized".',
   'folder.empty': 'No books here yet',
   'folder.emptyHint': 'Go to the "Add" tab and enter an ID',
@@ -561,9 +560,10 @@ const en = {
   'settings.openModeHint': "With the external browser, the page stays open after you share it back to the app; the in-app browser closes when you share.",
   'settings.mama': "Privacy mode",
   'settings.mamaHint': "Nothing awkward if someone glances at your screen. The \"⋮\" menu still shows everything.",
+  'settings.mamaDetail': "Details",
   'settings.mamaScope': "Apply to",
   'settings.mamaScope.library': "Folders page (cover grid)",
-  'settings.mamaScope.add': "\"Recently added\" on the Add page",
+  'settings.mamaScope.add': "\"Recently added\" on the Add page (also hides folders)",
   'settings.mamaHide': "Hide",
   'settings.mamaHide.cover': "Covers",
   'settings.mamaHide.title': "Titles",
@@ -572,7 +572,7 @@ const en = {
 
 [Share from browser] On an nhentai page, tap Android's Share and choose NH Shelfie. The ID is filled in for you — just tap Add.
 
-[Folders] Switch folders at the top of the Folders tab. Create folders from the menu; tap "⋯" next to a folder to rename, delete or reorder it. An item can be in several folders.
+[Folders] Switch folders at the top of the Folders tab. Create folders from the menu; drag the "≡" handle to reorder, or tap "⋯" next to a folder to rename or delete it. An item can be in several folders.
 
 [Item menu] Tap "⋮" at the top-right of a cover (or long-press an item in "Recently added") to see the full titles, write a note (saved when you tap elsewhere), copy the ID, choose folders, remove from this folder, re-fetch the cover or delete. For items that were not found, you can "Change ID" here.
 
@@ -599,10 +599,9 @@ const ja = {
   'folder.namePlaceholder': 'フォルダ名（1〜30文字）',
   'folder.rename': '名前を変更',
   'folder.delete': 'フォルダを削除',
-  'folder.moveUp': '上へ移動',
-  'folder.moveDown': '下へ移動',
   'folder.pick': 'フォルダを選択',
   'folder.more': 'その他の操作',
+  'folder.dragHandle': '押さえてドラッグで並べ替え',
   'folder.deleteConfirm': 'フォルダ「{name}」を削除しますか？\n本は削除されず、どのフォルダにもない本は「未分類」に戻ります。',
   'folder.empty': 'まだ本がありません',
   'folder.emptyHint': '「追加」タブで ID を入力してください',
@@ -757,9 +756,10 @@ const ja = {
   'settings.openModeHint': "外部ブラウザなら、ページから「共有」でアプリに戻っても元のページが残ります。アプリ内ブラウザは共有時に閉じられます。",
   'settings.mama': "ママモード",
   'settings.mamaHint': "画面を見られても気まずくならないように隠します。「⋮」メニューは通常どおり表示されます。",
+  'settings.mamaDetail': "詳細設定",
   'settings.mamaScope': "適用するページ",
   'settings.mamaScope.library': "フォルダページ（表紙一覧）",
-  'settings.mamaScope.add': "追加ページの「最近追加」",
+  'settings.mamaScope.add': "追加ページの「最近追加」（フォルダ名も隠す）",
   'settings.mamaHide': "隠す内容",
   'settings.mamaHide.cover': "表紙",
   'settings.mamaHide.title': "タイトル",
@@ -768,7 +768,7 @@ const ja = {
 
 【ブラウザから共有】nhentai のページで Android の「共有」から NH Shelfie を選ぶと、ID が自動入力されます。「追加」を押せば完了です。
 
-【フォルダ】「フォルダ」タブ上部でフォルダを切り替えます。メニューから新規作成でき、フォルダ横の「⋯」で名前の変更・削除・並べ替えができます。1 つの作品を複数のフォルダに入れられます。
+【フォルダ】「フォルダ」タブ上部でフォルダを切り替えます。メニューから新規作成でき、左の「≡」を押さえてドラッグすると並べ替え、横の「⋯」で名前の変更・削除ができます。1 つの作品を複数のフォルダに入れられます。
 
 【作品メニュー】表紙右上の「⋮」（または「最近追加」の行を長押し）で、完全なタイトルの確認、メモ（ほかの場所をタップで自動保存）、ID のコピー、フォルダ選択、このフォルダから外す、表紙の再取得、削除ができます。見つからなかった作品はここで「ID を修正」できます。
 
