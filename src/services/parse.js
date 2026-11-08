@@ -291,3 +291,41 @@ export function normalizeRecentLimit(v) {
   const n = Number.parseInt(v, 10)
   return RECENT_LIMITS.includes(n) ? n : 20
 }
+
+/** 存進 tags 表的標籤類型（全部 7 種，日後擴充不必再遷移）；介面篩選只用 FILTER_TAG_TYPES */
+export const TAG_TYPES = Object.freeze(['tag', 'artist', 'group', 'parody', 'character', 'language', 'category'])
+export const FILTER_TAG_TYPES = Object.freeze(['tag', 'artist', 'group'])
+
+/**
+ * 從詳情回應取出搜尋用欄位（api-v1 與 api-v2 結構相同：title.{english,japanese,pretty}、tags[{type,name}]）。
+ * 不檢查封面等必要欄位、欄位缺少也不丟錯；標籤去頭尾空白、同類型同名去重，未知類型略過。
+ * @returns {{titleEn:string, titleJa:string, tags:{type:string, name:string}[]}}
+ */
+export function parseSearchFields(json, rawFormat = 'api-v2') {
+  const out = { titleEn: '', titleJa: '', tags: [] }
+  if (!RAW_FORMATS.includes(rawFormat) || !json || typeof json !== 'object') return out
+  const t = json.title && typeof json.title === 'object' ? json.title : {}
+  out.titleEn = pickStr(t.english)
+  out.titleJa = pickStr(t.japanese)
+  const seen = new Set()
+  for (const x of Array.isArray(json.tags) ? json.tags : []) {
+    if (!x || typeof x !== 'object') continue
+    const type = typeof x.type === 'string' ? x.type.trim().toLowerCase() : ''
+    const name = pickStr(x.name)
+    if (!TAG_TYPES.includes(type) || !name) continue
+    const key = `${type}\u0000${name}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.tags.push({ type, name })
+  }
+  return out
+}
+
+/** book_raw 一列 → 搜尋用欄位；JSON 壞掉時回傳空結果（不丟錯） */
+export function parseSearchFieldsRaw(rawJson, rawFormat) {
+  try {
+    return parseSearchFields(JSON.parse(rawJson), rawFormat)
+  } catch {
+    return parseSearchFields(null, rawFormat)
+  }
+}

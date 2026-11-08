@@ -34,6 +34,8 @@ export const DEFAULTS = Object.freeze({
   mama_hide_cover: '1', // 隱藏封面（淺灰方塊，不載入圖片）
   mama_hide_title: '0', // 隱藏書名
   mama_hide_note: '0', // 隱藏備註
+  folder_filter: '["all"]', // 收藏頁資料夾篩選（多選）：["all"] 或 "uncat"／資料夾 id 的陣列；文字與標籤篩選不保留
+  tags_backfilled: '0', // 1 = 舊資料的標籤已從 book_raw 回填完成（schema v3）
   ...DEFAULT_ENDPOINTS,
 })
 

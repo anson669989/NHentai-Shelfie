@@ -12,7 +12,7 @@ Capacitor + Vue 3 的 Android App：輸入 gallery ID，背景抓書名與封面
 ## 指令
 
 - `npm install`：安裝依賴（首次後請 commit package-lock.json）
-- `npm test`：Vitest 單元測試（改 parse.js / csv.js / addPlan.js / locales.js / 解析邏輯後必跑）
+- `npm test`：Vitest 單元測試（改 parse.js / csv.js / addPlan.js / filter.js / locales.js / 解析邏輯後必跑）
 - `npm run build`：建置網頁到 dist/
 - `npm run android:prepare`：build → 產生 android/ → 套用 patch → cap sync
 - 驗證 APK：推到 GitHub 由 Actions 建置（`.github/workflows/build-apk.yml`），本機不一定有 Android SDK
@@ -21,10 +21,11 @@ Capacitor + Vue 3 的 Android App：輸入 gallery ID，背景抓書名與封面
 
 - `src/components/*.vue`：介面層，只呼叫服務層，不直接碰 DB、檔案、網路
 - `src/components/bookActions.js`：「⋮」單本選單（含備註）與開網頁，資料夾頁與新增頁「最近加入」共用，不要各複製一份；`viewOptions.js`（純函式）算顯示備註／媽媽模式
+- `src/components/TagFilter.vue`：收藏頁標籤／作者／社團篩選（可打字＋勾選清單、右上角「全部清除」）；資料夾篩選用 `actionSheet` 的 `multi` 模式（勾選不關選單、標題列右邊「全部清除」）
 - `src/services/library.js`：服務層入口，唯一碰 SQLite 與檔案的地方；背景佇列（meta／cover 兩個工作者）也在這裡
 - `src/services/nhSource.js`：**唯一**對 nhentai 發請求與解析的地方；站方改版只改這裡；也是唯一 import `nh-webfetch` 的地方（含接收分享的 `takeSharedText`／`onShareReceived`）。使用 **API v2**（`/api/v2/galleries/{id}`、`/api/v2/cdn`，規格摘要見 `docs/tasks/004-api-v2.md` 第 5 節）；舊 `/api/gallery/{id}` 已停用
 - `plugins/nh-webfetch/`：本地 Capacitor 外掛（Java），獨立隱藏 WebView 過 Cloudflare 後抓 API、驗證畫面、清 cookie；**nh-webfetch 也負責接收分享**（瀏覽器「分享」的 ACTION_SEND 文字；intent-filter 由 `patch-android.mjs` 加到 MainActivity）與 `openExternal`（以系統瀏覽器開網頁，Java 端再檢查 https＋nhentai 網域；JS 由 nhSource 的 `openInBrowser` 呼叫，依設定 `open_mode` 選外部瀏覽器或 Custom Tab）；`cap sync` 自動納入，不需改 android/
-- `src/services/parse.js`、`csv.js`、`errors.js`、`settingsMigration.js`、`addPlan.js`：純函式，無 I/O，必須有單元測試
+- `src/services/parse.js`、`csv.js`、`errors.js`、`settingsMigration.js`、`addPlan.js`、`filter.js`：純函式，無 I/O，必須有單元測試（`filter.js`＝搜尋／篩選：資料夾多選規則、標籤選項排序、參數化 WHERE 組裝）
 - `src/services/db.js`：連線與 schema 遷移
 - `src/locales.js`：所有介面字串（繁中 zh-TW / 简中 zh-CN / English / 日本語）四份同步，純資料（`tests/locales.test.js` 檢查四語鍵一致）；`src/i18n.js` 只放 `t()`、`errText()` 與語言偵測
 - `scripts/patch-android.mjs`：對 `cap add android` 產生的專案套設定（含 App 圖示、分享 intent-filter）；android/ 不進版控
@@ -42,7 +43,7 @@ Capacitor + Vue 3 的 Android App：輸入 gallery ID，背景抓書名與封面
    - **圖片隊伍**（`imgLane.run`）：t1–t4 封面；同時 1 個、間隔 ≥ 1 秒（`/api/v2/docs` 對 CDN 沒有明文次數，只說持續高速會被暫時封鎖、429 當退避訊號，所以採保守 1 秒）
    - 兩條隊伍互不卡住；收到 429 只暫停該隊伍（`lane.block`），背景佇列自動退避重試、畫面顯示「請求太頻繁，稍後自動重試」，不算失敗
    - 不可在某條隊伍的工作內再呼叫會排進**同一條**隊伍的函式（會互等卡死；例：`downloadCover` 在進圖片隊伍前先呼叫 `getThumbServers`）
-7. **schema 變更只能在 `MIGRATIONS` 陣列尾端新增版本**，不改舊版本（目前到 v2）
+7. **schema 變更只能在 `MIGRATIONS` 陣列尾端新增版本**，不改舊版本（目前到 v3）
 8. **新增 UI 字串四種語言（zh-TW / zh-CN / en / ja）都要補**；新增設定鍵要加進 settings.js 的 `DEFAULTS`
 9. 不新增 Capacitor 外掛（例外：repo 內的本地外掛 `nh-webfetch`）、不加廣告或分析 SDK，不新增 Android 權限（目前只有 INTERNET）
 10. Cloudflare challenge 特徵字串在 `parse.js` 的 `CHALLENGE_MARKERS` 與 `NhWebFetchPlugin.java` 各一份，改一邊要同步另一邊
@@ -72,6 +73,7 @@ Capacitor + Vue 3 的 Android App：輸入 gallery ID，背景抓書名與封面
 
 ### 待實機驗收
 
+- `docs/tasks/007-search-notes-privacy.md`（v0.3.0）：階段 A、B 已驗收；階段 C（搜尋、標籤／資料夾多選篩選、schema v3）待驗收，手機測完沒問題才推 `v0.3.0` 標籤發佈
 - `docs/tasks/006-ui-batch.md`（v0.2.0）：# 開頭 ID、先存後查與背景佇列、多選模式、⋮ 單本選單、封面下方書名、從瀏覽器分享、简体中文、README 改版；手機測完沒問題才推 `v0.2.0` 標籤發佈
 - `docs/tasks/005-batch.md`：封面下載修正（先建資料夾）、白話錯誤訊息、清除封面快取、新圖示
 - `docs/tasks/002-folder-dropdown.md`：資料夾下拉選單已實作，驗收清單尚未勾選
@@ -80,7 +82,9 @@ Capacitor + Vue 3 的 Android App：輸入 gallery ID，背景抓書名與封面
 
 - 已做：M1 路線 A MVP、M2 設定頁、M3 CSV、API v2、Cloudflare 備援 2（WebView 驗證抓取，現在只在原生被擋時才用）、隱藏開發者模式（關於 → 版本 連點 7 次）
 - 已做（006）：先存後查＋兩條節流隊伍、多選、⋮ 選單、分享加入、简体中文；schema v2＝`books.queue_seq` 與新的 `fetch_status` 值（舊 `pending` 自動轉換）
-- 未做：M4 詳情頁（標籤＋備註）、M5 標籤搜尋（tags / book_tags 以 `MIGRATIONS` 新增 **v3**，從 book_raw 本地解析）
+- 已做（007）：開啟網頁方式（`open_mode`）、⋮ 選單備註、顯示備註、媽媽模式、最近加入改版、資料夾拖曳排序、收藏頁搜尋與篩選；schema v3＝`tags`／`book_tags`／`books.title_en`
+- 搜尋與篩選：`標籤（且）` 且 `資料夾（或）` 且 `文字`（英／日標題、備註、ID）；只保留資料夾篩選（設定 `folder_filter`），文字與標籤每次開 App 清空。新書的標籤在 meta 工作者寫書名的同一個交易寫入；舊資料由 `library.backfillTags` 從 book_raw 本地分批回填（`tags_backfilled`）
+- 已取消：M4 詳情頁與標籤顯示（點封面一律開網頁，備註在 ⋮ 選單編輯；標籤只做搜尋與篩選）
 - 未做：Cloudflare 備援 3（手動指定封面）、FLAG_SECURE、App 開啟鎖
 - 背景佇列只在前景執行（不加背景服務與權限）
 - README 截圖區用 HTML 註解隱藏；`docs/screenshots/library.png`、`add.png`、`settings.png` 放好後移除兩份 README 的註解

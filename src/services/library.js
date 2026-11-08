@@ -12,7 +12,10 @@ import {
   normalizeNote,
   normalizeRecentLimit,
   parseGallery,
+  parseSearchFieldsRaw,
+  FILTER_TAG_TYPES,
 } from './parse.js'
+import { buildFilterWhere } from './filter.js'
 import { planAdd } from './addPlan.js'
 import { buildCsv, validateCsv, CSV_MAX_BYTES } from './csv.js'
 import { loadSettings, migrateSettings, setSetting, settings } from './settings.js'
@@ -75,6 +78,7 @@ export async function initLibrary() {
   await clearPreviewCache()
   await cleanupOrphanCovers().catch((e) => console.warn('orphan cleanup failed', e))
   await refreshPendingCount()
+  backfillTags().catch((e) => console.warn('tag backfill failed', e)) // 不擋啟動，前景分批做
 }
 
 function joinSrc(base, path) {
@@ -156,20 +160,69 @@ export const SORT_MODES = Object.keys(SORT_SQL)
 const LIST_COLS = 'b.gallery_id, b.title, b.note, b.cover_path, b.cover_rev, b.fetch_status'
 
 /**
- * 列表查詢只取顯示欄位（raw_json 在獨立的 book_raw 表）。
- * @param {'all'|'uncat'|number} folderKey
+ * 收藏頁列表：只取顯示欄位（不 SELECT book_raw）。
+ * 條件：標籤（且）且 資料夾（或）且 文字（書名英／日、備註、ID），見 filter.js 的 buildFilterWhere。
+ * @param {{folders?:('all'|'uncat'|number)[], tagIds?:number[], text?:string}} filter
  */
-export async function listBooks(folderKey, sortMode) {
+export async function listBooks(filter, sortMode) {
   const order = SORT_SQL[sortMode] || SORT_SQL.added_desc
-  if (folderKey === 'all') return query(`SELECT ${LIST_COLS} FROM books b ORDER BY ${order}`)
-  if (folderKey === 'uncat')
-    return query(
-      `SELECT ${LIST_COLS} FROM books b WHERE NOT EXISTS (SELECT 1 FROM book_folders bf WHERE bf.gallery_id = b.gallery_id) ORDER BY ${order}`,
-    )
+  const { where, values } = buildFilterWhere(filter || {})
+  return query(`SELECT ${LIST_COLS} FROM books b ${where ? 'WHERE ' + where : ''} ORDER BY ${order}`, values)
+}
+
+/** 標籤篩選的選項：只列 tag／artist／group 且本數 > 0 的。[{id, type, name, n}] */
+export async function listTagOptions() {
   return query(
-    `SELECT ${LIST_COLS} FROM books b JOIN book_folders bf ON bf.gallery_id = b.gallery_id WHERE bf.folder_id = ? ORDER BY ${order}`,
-    [Number(folderKey)],
+    `SELECT t.id, t.type, t.name, COUNT(*) AS n FROM tags t JOIN book_tags bt ON bt.tag_id = t.id
+     WHERE t.type IN (${FILTER_TAG_TYPES.map(() => '?').join(',')}) GROUP BY t.id`,
+    [...FILTER_TAG_TYPES],
   )
+}
+
+/** 一本書的標籤寫入語句（整批取代）；放進寫書名的同一個交易 */
+function tagStatements(id, tags) {
+  const out = [{ statement: 'DELETE FROM book_tags WHERE gallery_id = ?', values: [id] }]
+  for (const { type, name } of tags) {
+    out.push({ statement: 'INSERT OR IGNORE INTO tags(type, name) VALUES (?, ?)', values: [type, name] })
+    out.push({
+      statement: 'INSERT OR IGNORE INTO book_tags(gallery_id, tag_id) SELECT ?, id FROM tags WHERE type = ? AND name = ?',
+      values: [id, type, name],
+    })
+  }
+  return out
+}
+
+/**
+ * schema v3 的舊資料回填：從 book_raw 本地解析英文標題與標籤（不上網），每批 100 本、一批一個交易。
+ * 完成後記 tags_backfilled，下次不再做。中途關 App 下次會從頭再做一次（寫入是整批取代，結果相同）。
+ */
+let backfilling = false
+async function backfillTags() {
+  if (settings.tags_backfilled === '1' || backfilling) return
+  backfilling = true
+  try {
+    let last = 0
+    for (;;) {
+      const rows = await query(
+        'SELECT r.gallery_id, r.raw_json, r.raw_format FROM book_raw r WHERE r.gallery_id > ? ORDER BY r.gallery_id LIMIT 100',
+        [last],
+      )
+      if (!rows.length) break
+      const set = []
+      for (const r of rows) {
+        const f = parseSearchFieldsRaw(r.raw_json, r.raw_format)
+        set.push({ statement: 'UPDATE books SET title_en = ? WHERE gallery_id = ?', values: [f.titleEn, r.gallery_id] })
+        set.push(...tagStatements(r.gallery_id, f.tags))
+      }
+      await transaction(set)
+      last = rows[rows.length - 1].gallery_id
+      bump()
+      await new Promise((r) => setTimeout(r, 0)) // 讓出主執行緒，畫面不卡
+    }
+    await setSetting('tags_backfilled', '1')
+  } finally {
+    backfilling = false
+  }
 }
 
 /**
@@ -371,7 +424,12 @@ export async function deleteBooks(ids) {
     const b = await getBook(id)
     if (b?.cover_path) paths.push(b.cover_path)
   }
-  await transaction(ids.map((id) => ({ statement: 'DELETE FROM books WHERE gallery_id = ?', values: [Number(id)] })))
+  await transaction(
+    ids.flatMap((id) => [
+      { statement: 'DELETE FROM book_tags WHERE gallery_id = ?', values: [Number(id)] },
+      { statement: 'DELETE FROM books WHERE gallery_id = ?', values: [Number(id)] },
+    ]),
+  )
   for (const p of paths) await deleteCoverFile(p)
   bump()
   await refreshPendingCount()
@@ -413,6 +471,7 @@ export async function changeBookId(oldId, newId) {
         values: [newId, old.note ?? null, old.added_at, nextSeq()],
       },
       { statement: 'UPDATE book_folders SET gallery_id = ? WHERE gallery_id = ?', values: [newId, oldId] },
+      { statement: 'DELETE FROM book_tags WHERE gallery_id = ?', values: [oldId] },
       { statement: 'DELETE FROM books WHERE gallery_id = ?', values: [oldId] },
     ])
   } catch (err) {
@@ -685,17 +744,20 @@ async function metaLoop() {
     queueState.netWaitUntil = 0
     queueState.challenge = false
     if (!(await getBook(id))) continue // 查詢途中被刪除或改了 ID
+    const sf = parseSearchFieldsRaw(d.rawJson, d.rawFormat)
     try {
+      // 書名、原始資料與標籤同一個交易（不留半套）
       await transaction([
         {
           statement:
-            "UPDATE books SET media_id = ?, title = ?, title_ja = ?, cover_ext = ?, fetch_status = CASE WHEN fetch_status = 'meta_pending' THEN 'cover_pending' ELSE fetch_status END WHERE gallery_id = ?",
-          values: [d.meta.mediaId, d.meta.title, d.meta.titleJa, d.meta.coverExt, id],
+            "UPDATE books SET media_id = ?, title = ?, title_ja = ?, title_en = ?, cover_ext = ?, fetch_status = CASE WHEN fetch_status = 'meta_pending' THEN 'cover_pending' ELSE fetch_status END WHERE gallery_id = ?",
+          values: [d.meta.mediaId, d.meta.title, d.meta.titleJa, sf.titleEn, d.meta.coverExt, id],
         },
         {
           statement: 'INSERT OR REPLACE INTO book_raw(gallery_id, raw_json, raw_format) VALUES (?,?,?)',
           values: [id, d.rawJson, d.rawFormat],
         },
+        ...tagStatements(id, sf.tags),
       ])
     } catch (err) {
       queueState.error = dbError(err).code

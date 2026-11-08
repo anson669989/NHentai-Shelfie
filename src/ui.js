@@ -62,14 +62,16 @@ export const promptDialog = (title, { value = '', placeholder = '', maxlength = 
  *   drag（左側 ≡ 拖曳把手，需搭配 more；可拖的列要相鄰）；
  * `{ divider: true }` 為分隔線。
  * @param {{label?:string, value?:any, danger?:boolean, checked?:boolean, more?:boolean, divider?:boolean}[]} actions
- * @param {{tall?:boolean, lines?:string[], note?:{value:string, label?:string, placeholder?:string, save?:(v:string)=>any}, onReorder?:(values:any[])=>any}} [opts]
+ * @param {{tall?:boolean, lines?:string[], note?:{value:string, label?:string, placeholder?:string, save?:(v:string)=>any}, onReorder?:(values:any[])=>any, multi?:{selected:any[], toggle:(value:any)=>any[]|Promise<any[]>, clear?:()=>any[]|Promise<any[]>, clearLabel?:string}}} [opts]
  *   tall：最大高度 70vh、可捲動（長清單用）；lines：標題下方的純文字行（例如完整書名），可選取複製；
  *   note：單行備註輸入框（直接改 note.value；離開輸入框時呼叫 note.save；貼上的換行轉成空白）
  *   onReorder：拖曳放開後以新順序的 value 陣列呼叫；回傳的 Promise 失敗時畫面還原、顯示錯誤
+ *   multi：多選模式。帶 check: true 的列顯示勾選框，點了呼叫 multi.toggle(value) 換成回傳的勾選結果、選單不關；
+ *     有 multi.clear 時標題列右邊出現「全部清除」；最下方的按鈕變成「完成」
  * @returns {Promise<any|{more:any}|false>}
  */
-export const actionSheet = (title, actions, { tall = false, lines = [], note = null, onReorder = null } = {}) =>
-  open('sheet', { title, actions, tall, lines: lines.filter(Boolean), note, onReorder })
+export const actionSheet = (title, actions, { tall = false, lines = [], note = null, onReorder = null, multi = null } = {}) =>
+  open('sheet', { title, actions, tall, lines: lines.filter(Boolean), note, onReorder, multi })
 
 /**
  * 多選清單

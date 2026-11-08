@@ -8,22 +8,52 @@
         {{ allSelected ? t('select.none') : t('select.all') }}
       </button>
     </header>
-    <header v-else class="folder-bar">
-      <button class="select-like folder-select" :aria-label="t('folder.pick')" @click="openPicker">
-        <span class="folder-select-name">{{ currentName }}</span>
-        <small class="muted">({{ currentCount }})</small>
-        <span class="caret">▾</span>
-      </button>
-      <select class="sort-select" :value="sortMode" @change="changeSort($event.target.value)">
-        <option v-for="m in SORT_MODES" :key="m" :value="m">{{ t('sort.' + m) }}</option>
-      </select>
+    <header v-else class="folder-bar filter-bar">
+      <!-- 第一列：標籤／作者／社團（可打字）｜排序 -->
+      <div class="filter-row">
+        <TagFilter ref="tagFilter" v-model="tagIds" :options="tagOptions" />
+        <select class="sort-select" :value="sortMode" @change="changeSort($event.target.value)">
+          <option v-for="m in SORT_MODES" :key="m" :value="m">{{ t('sort.' + m) }}</option>
+        </select>
+      </div>
+      <!-- 第二列：作品名稱／備註／ID｜資料夾篩選（多選） -->
+      <div class="filter-row">
+        <div class="tag-input-wrap">
+          <input
+            v-model="textInput"
+            class="input text-search"
+            type="search"
+            enterkeyhint="search"
+            autocomplete="off"
+            :aria-label="t('filter.textPlaceholder')"
+            :placeholder="t('filter.textPlaceholder')"
+            @keydown.enter.prevent="$event.target.blur()"
+          />
+          <button v-if="textInput" class="input-clear" type="button" :aria-label="t('filter.clear')" @click="clearText">
+            ✕
+          </button>
+        </div>
+        <button class="select-like folder-select" :aria-label="t('filter.folderTitle')" @click="openPicker">
+          <span class="folder-select-name">{{ folderLabel }}</span>
+          <small v-if="folderCount != null" class="muted">({{ folderCount }})</small>
+          <span class="caret">▾</span>
+        </button>
+      </div>
     </header>
+
+    <div v-if="!selecting && filtering" class="filter-result">
+      <span>{{ t('filter.found', { n: books.length }) }}</span>
+      <button class="btn text" @click="clearAllFilters">{{ t('filter.clearAll') }}</button>
+    </div>
 
     <QueueBanner />
 
     <div v-if="loaded && !books.length" class="empty">
-      <p>{{ t('folder.empty') }}</p>
-      <p class="muted">{{ t('folder.emptyHint') }}</p>
+      <p v-if="filtering">{{ t('filter.noResult') }}</p>
+      <template v-else>
+        <p>{{ t('folder.empty') }}</p>
+        <p class="muted">{{ t('folder.emptyHint') }}</p>
+      </template>
     </div>
     <CoverGrid
       v-else
@@ -58,9 +88,11 @@
 import { computed, ref, watch } from 'vue'
 import CoverGrid from './CoverGrid.vue'
 import QueueBanner from './QueueBanner.vue'
+import TagFilter from './TagFilter.vue'
 import {
   dataVersion,
   listBooks,
+  listTagOptions,
   listFolders,
   folderCounts,
   getSortMode,
@@ -74,7 +106,14 @@ import {
   removeBooksFromFolder,
   deleteBooks,
 } from '../services/library.js'
-import { settings } from '../services/settings.js'
+import { settings, setSetting } from '../services/settings.js'
+import {
+  normalizeFolderFilter,
+  toggleFolderFilter,
+  sortKeyOf,
+  hasActiveFilter,
+  normalizeSearchText,
+} from '../services/filter.js'
 import { t, errText } from '../i18n.js'
 import { actionSheet, confirmDialog, promptDialog, toast, pushBackHandler } from '../ui.js'
 import { openBook, openBookMenu, pickFoldersDialog } from './bookActions.js'
@@ -84,7 +123,13 @@ const props = defineProps({ active: Boolean })
 
 const folders = ref([])
 const books = ref([])
-const current = ref('all')
+// 篩選：資料夾（多選「或」，記在設定）、標籤（多選「且」）、文字；文字與標籤每次開 App 清空
+const folderFilter = ref(normalizeFolderFilter(settings.folder_filter))
+const tagIds = ref([])
+const tagOptions = ref([])
+const textInput = ref('')
+const searchText = ref('') // 停止輸入約 300 ms 後才更新
+const tagFilter = ref(null)
 const sortMode = ref('added_desc')
 const counts = ref({ all: 0, uncat: 0, byFolder: {} })
 const loaded = ref(false)
@@ -97,26 +142,40 @@ let removeBack = null
 
 const countOf = (key) =>
   key === 'all' ? counts.value.all : key === 'uncat' ? counts.value.uncat : counts.value.byFolder[key] || 0
-/** 目前所在的自建資料夾；「全部」「未分類」為 null（預設資料夾不顯示「從此資料夾移除」） */
-const currentFolder = computed(() =>
-  typeof current.value === 'number' ? folders.value.find((f) => f.id === current.value) || null : null,
+/** 只篩選一個自建資料夾時才有（多選批次的「從此資料夾移除」）；「全部」「未分類」或多選為 null */
+const currentFolder = computed(() => {
+  const f = folderFilter.value
+  return f.length === 1 && typeof f[0] === 'number' ? folders.value.find((x) => x.id === f[0]) || null : null
+})
+const nameOf = (key) =>
+  key === 'all' ? t('folder.all') : key === 'uncat' ? t('folder.uncat') : folders.value.find((f) => f.id === key)?.name || ''
+const folderLabel = computed(() =>
+  folderFilter.value.length === 1 ? nameOf(folderFilter.value[0]) : t('filter.foldersN', { n: folderFilter.value.length }),
 )
-const currentName = computed(() =>
-  current.value === 'all' ? t('folder.all') : current.value === 'uncat' ? t('folder.uncat') : currentFolder.value?.name || '',
-)
-const currentCount = computed(() => countOf(current.value))
+const folderCount = computed(() => (folderFilter.value.length === 1 ? countOf(folderFilter.value[0]) : null))
+const filter = computed(() => ({ folders: folderFilter.value, tagIds: tagIds.value, text: searchText.value }))
+const filtering = computed(() => hasActiveFilter(filter.value))
 /** 顯示備註與媽媽模式（收藏頁） */
 const view = computed(() => viewOptions(settings, 'library'))
 const allSelected = computed(() => books.value.length > 0 && selected.value.size === books.value.length)
 
+let reloadSeq = 0
 async function reload() {
+  const seq = ++reloadSeq // 連續觸發時只採用最後一次的結果
   folders.value = await listFolders()
-  if (typeof current.value === 'number' && !folders.value.some((f) => f.id === current.value)) {
-    current.value = 'all' // 目前所在的資料夾被刪除 → 回到「全部」
+  // 勾選的資料夾被刪除 → 從篩選拿掉（全都沒了就回到「全部」）
+  const ff = normalizeFolderFilter(folderFilter.value, folders.value.map((f) => f.id))
+  if (JSON.stringify(ff) !== JSON.stringify(folderFilter.value)) {
+    await setFolderFilter(ff, false)
     grid.value?.scrollToTop?.()
   }
-  sortMode.value = await getSortMode(current.value)
-  books.value = await listBooks(current.value, sortMode.value)
+  tagOptions.value = await listTagOptions()
+  const known = new Set(tagOptions.value.map((o) => o.id))
+  if (tagIds.value.some((id) => !known.has(id))) tagIds.value = tagIds.value.filter((id) => known.has(id))
+  sortMode.value = await getSortMode(sortKeyOf(folderFilter.value))
+  const list = await listBooks(filter.value, sortMode.value)
+  if (seq !== reloadSeq) return
+  books.value = list
   counts.value = await folderCounts()
   loaded.value = true
   if (selecting.value) {
@@ -126,11 +185,50 @@ async function reload() {
   }
 }
 
+// 篩選條件改變 → 重新查詢並捲回頂端
+async function applyFilter() {
+  try {
+    await reload()
+    grid.value?.scrollToTop?.()
+  } catch (e) {
+    toast(errText(e))
+  }
+}
+watch(tagIds, applyFilter)
+watch(searchText, applyFilter)
+let textTimer = null
+watch(textInput, (v) => {
+  clearTimeout(textTimer)
+  textTimer = setTimeout(() => (searchText.value = normalizeSearchText(v)), 300)
+})
+
+function clearText() {
+  clearTimeout(textTimer)
+  textInput.value = ''
+  searchText.value = ''
+}
+
+async function setFolderFilter(value, apply = true) {
+  folderFilter.value = normalizeFolderFilter(value)
+  await setSetting('folder_filter', JSON.stringify(folderFilter.value)) // 只有資料夾篩選在重開 App 後保留
+  if (apply) await applyFilter()
+}
+
+function clearAllFilters() {
+  tagFilter.value?.hide()
+  tagIds.value = []
+  clearText()
+  setFolderFilter(['all']).catch((e) => toast(errText(e)))
+}
+
 watch(
   () => [props.active, dataVersion.value],
   ([active]) => {
     if (active) reload().catch((e) => toast(errText(e)))
-    else exitSelect()
+    else {
+      exitSelect()
+      tagFilter.value?.hide() // 切到別頁時收合標籤清單
+    }
   },
   { immediate: true },
 )
@@ -164,7 +262,7 @@ function exitSelect() {
 
 async function batchClassify() {
   const ids = [...selected.value]
-  const others = folders.value.filter((f) => f.id !== current.value)
+  const others = folders.value.filter((f) => f.id !== currentFolder.value?.id)
   const picked = await pickFoldersDialog(
     t('select.classifyTitle', { n: ids.length }),
     others.map((f) => ({ label: f.name, value: f.id })),
@@ -208,11 +306,11 @@ async function batchDelete() {
   }
 }
 
-// ---- 資料夾選單 ----
+// ---- 資料夾篩選（多選「或」）：勾選即時套用、選單不關；右上角「全部清除」回到「全部」 ----
 async function openPicker() {
-  const row = (key, label) => ({ label: `${label} (${countOf(key)})`, value: key, checked: current.value === key })
+  const row = (key, label) => ({ label: `${label} (${countOf(key)})`, value: key, check: true })
   const action = await actionSheet(
-    t('folder.pick'),
+    t('filter.folderTitle'),
     [
       row('all', t('folder.all')),
       row('uncat', t('folder.uncat')),
@@ -221,26 +319,35 @@ async function openPicker() {
       ...(folders.value.length ? [{ divider: true }] : []),
       { label: '＋ ' + t('folder.new'), value: '__new' },
     ],
-    { tall: true, onReorder: (ids) => reorderFolders(ids) }, // 按住 ≡ 拖曳排序，放開才寫入
+    {
+      tall: true,
+      onReorder: (ids) => reorderFolders(ids), // 按住 ≡ 拖曳排序，放開才寫入
+      multi: {
+        selected: folderFilter.value.slice(),
+        toggle: async (key) => {
+          await setFolderFilter(toggleFolderFilter(folderFilter.value, key))
+          return folderFilter.value.slice()
+        },
+        clear: async () => {
+          await setFolderFilter(['all'])
+          return folderFilter.value.slice()
+        },
+      },
+    },
   )
-  if (action === false || action == null) return
   if (action === '__new') return newFolder()
-  if (typeof action === 'object' && 'more' in action) {
+  if (action && typeof action === 'object' && 'more' in action) {
     const f = folders.value.find((x) => x.id === action.more)
     if (f && (await folderMenu(f))) openPicker() // 管理完回到選單，方便連續操作
-    return
   }
-  select(action)
 }
 
 async function select(key) {
-  current.value = key
-  await reload()
-  grid.value?.scrollToTop?.()
+  await setFolderFilter([key])
 }
 
 async function changeSort(mode) {
-  await setSortMode(current.value, mode)
+  await setSortMode(sortKeyOf(folderFilter.value), mode) // 多選資料夾時改的是「全部」的排序
   await reload()
 }
 

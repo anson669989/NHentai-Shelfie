@@ -56,7 +56,7 @@ git push -u origin feat/detail-page # push 會觸發 Actions 建 debug APK 供�
 ```
 
 6. **測試 APK：** 到 GitHub → Actions → 最新一次執行 → Artifacts 下載 APK 安裝。
-7. **正式發佈：** 合併到 main 後打標籤 `git tag v0.2.0 && git push origin v0.2.0`。
+7. **正式發佈：** 合併到 main 後打標籤 `git tag v0.3.0 && git push origin v0.3.0`。
 
 ## 4. 常用指令
 
@@ -77,30 +77,26 @@ git push -u origin feat/detail-page # push 會觸發 Actions 建 debug APK 供�
 - 任務描述寫清楚「改哪個檔案、要什麼行為、驗收方式」，避免它漫無目的地搜尋
 - 不要貼整個檔案給它，給路徑就好
 - 要求「只改必要處、不要整檔重寫」
-- 新功能分里程碑做（M4、M5 各一個 session）
+- 新功能分階段做（例如任務 007 的 A／B／C 階段各一個 session）
 - 看到上下文快滿（`/context`）就先 commit，再 `/clear`
 - 大範圍檢視（例如「檢查所有地方是否符合安全規則」）放在獨立 session，不要混在功能開發裡
 
 ## 6. 範例提示詞
 
-**M4 詳情頁**
+**依任務文件做一個階段**
 
 ```
-實作 M4 詳情頁。需求：
-- 點封面改為開詳情頁（標籤、個人備註、「在瀏覽器開啟」按鈕）
-- 設定頁新增「點擊直接開網頁」選項，開啟時維持現狀行為
-- 標籤從 book_raw.raw_json 本地解析，不新增網路請求
-- 備註寫入 books.note，純文字顯示
-- 新增字串三種語言都補
-先用 Plan Mode 列出要改的檔案，我確認後再動手。完成後跑 npm test 與 npm run build。
+照 docs/tasks/007-search-notes-privacy.md 做階段 C。
+先用 Plan Mode 列出要改的檔案，我確認後再動手。
+完成後跑 npm test 與 npm run build，並更新 CLAUDE.md、docs/DEVELOPMENT.md、README。
 ```
 
-**M5 標籤搜尋**
+**新增資料表欄位**
 
 ```
-實作 M5 路線 B。在 db.js 的 MIGRATIONS 新增 v2：tags、book_tags 與索引，
-遷移時從 book_raw 回填。資料夾頁加標籤篩選。
-raw_format 為 api-v1 的才解析；解析器放 parse.js 並補單元測試。
+在 db.js 的 MIGRATIONS 尾端新增 v4（不改舊版本），目前到 v3。
+需要從 book_raw 回填的資料在 library.js 啟動後本地分批處理，不上網；
+解析器放 parse.js 並補單元測試（api-v1、api-v2 都要支援）。
 ```
 
 **站方改版時**
@@ -108,7 +104,7 @@ raw_format 為 api-v1 的才解析；解析器放 parse.js 並補單元測試。
 ```
 nhentai 的詳情 API 回應格式變了，這是新的回應內容：<貼上一份 JSON>
 只修改 src/services/parse.js 的 parseGallery 與對應測試，
-並新增 raw_format 版本 api-v2，保持 api-v1 仍可解析。
+並新增 raw_format 版本 api-v3，保持 api-v1、api-v2 仍可解析。
 ```
 
 **除錯**

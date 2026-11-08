@@ -42,7 +42,13 @@
 
       <!-- 動作選單 -->
       <div v-else-if="d.kind === 'sheet'" class="sheet" :class="{ tall: d.tall }">
-        <h3 v-if="d.title" class="sheet-title">{{ d.title }}</h3>
+        <!-- 標題列（固定高度、不會被下方清單擠扁）；多選模式右上角有「全部清除」 -->
+        <div v-if="d.title || d.multi?.clear" class="sheet-head">
+          <h3 class="sheet-title">{{ d.title }}</h3>
+          <button v-if="d.multi?.clear" class="btn text sheet-clear" @click="clearMulti(d)">
+            {{ d.multi.clearLabel || t('filter.clear') }}
+          </button>
+        </div>
         <p v-for="(line, i) in d.lines" :key="'l' + i" class="sheet-line">{{ line }}</p>
         <!-- 單行備註：不限長度，離開輸入框自動儲存；Enter 只收起鍵盤 -->
         <label v-if="d.note" class="sheet-note">
@@ -71,18 +77,22 @@
               @contextmenu.prevent
               >≡</span
             >
-            <button class="sheet-item" :class="{ danger: a.danger }" @click="closeDialog(d, a.value)">
+            <button class="sheet-item" :class="{ danger: a.danger }" @click="pick(d, a)">
+              <span v-if="isMulti(d, a)" class="sheet-box" :class="{ on: isChecked(d, a) }" aria-hidden="true" />
               <span class="sheet-label">{{ a.label }}</span>
-              <span v-if="a.checked" class="sheet-check">✓</span>
+              <span v-if="!isMulti(d, a) && a.checked" class="sheet-check">✓</span>
             </button>
             <button class="sheet-more" :aria-label="t('folder.more')" @click="closeDialog(d, { more: a.value })">⋯</button>
           </div>
-          <button v-else class="sheet-item" :class="{ danger: a.danger }" @click="closeDialog(d, a.value)">
+          <button v-else class="sheet-item" :class="{ danger: a.danger }" @click="pick(d, a)">
+            <span v-if="isMulti(d, a)" class="sheet-box" :class="{ on: isChecked(d, a) }" aria-hidden="true" />
             <span class="sheet-label">{{ a.label }}</span>
-            <span v-if="a.checked" class="sheet-check">✓</span>
+            <span v-if="!isMulti(d, a) && a.checked" class="sheet-check">✓</span>
           </button>
         </template>
-        <button class="sheet-item cancel" @click="closeDialog(d, false)">{{ t('common.cancel') }}</button>
+        <button class="sheet-item cancel" @click="closeDialog(d, false)">
+          {{ d.multi ? t('filter.done') : t('common.cancel') }}
+        </button>
       </div>
 
       <!-- 多選清單 -->
@@ -140,6 +150,27 @@ function onDragStart(e, d) {
       })
     },
   })
+}
+
+// ---- 多選選單（d.multi）：a.check 的列點了只切換勾選、不關閉；其他列照常關閉並回傳 value ----
+const isMulti = (d, a) => !!d.multi && !!a.check
+const isChecked = (d, a) => d.multi.selected.some((v) => v === a.value)
+
+async function pick(d, a) {
+  if (!isMulti(d, a)) return closeDialog(d, a.value)
+  try {
+    d.multi.selected = await d.multi.toggle(a.value)
+  } catch (err) {
+    toast(errText(err))
+  }
+}
+
+async function clearMulti(d) {
+  try {
+    d.multi.selected = await d.multi.clear()
+  } catch (err) {
+    toast(errText(err))
+  }
 }
 
 /** 貼上多行文字到單行備註：換行轉空白後插入游標位置 */

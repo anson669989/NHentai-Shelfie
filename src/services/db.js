@@ -69,7 +69,23 @@ const MIGRATIONS = [
     WHERE fetch_status = 'pending';
   CREATE INDEX IF NOT EXISTS idx_books_queue ON books(fetch_status, queue_seq);
   `,
-  // v3（路線 B，M5 時啟用）：tags / book_tags —— 目前尚未加入，標籤可由 book_raw 本地解析補建。
+  // v3（任務 007 搜尋與標籤篩選）：tags／book_tags，books 補英文標題 title_en（文字搜尋用）。
+  // 遷移只建表；舊資料由 library.js 啟動後從 book_raw 本地分批回填（不上網，完成後記 tags_backfilled）。
+  `
+  ALTER TABLE books ADD COLUMN title_en TEXT NOT NULL DEFAULT '';
+  CREATE TABLE IF NOT EXISTS tags (
+    id   INTEGER PRIMARY KEY,
+    type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    UNIQUE (type, name)
+  );
+  CREATE TABLE IF NOT EXISTS book_tags (
+    gallery_id INTEGER NOT NULL REFERENCES books(gallery_id) ON DELETE CASCADE,
+    tag_id     INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (gallery_id, tag_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_book_tags_tag ON book_tags(tag_id);
+  `,
 ]
 
 export async function initDb() {

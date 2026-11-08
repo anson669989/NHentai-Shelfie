@@ -8,9 +8,9 @@ Capacitor + Vue 3 的 Android App：輸入 gallery ID，在背景抓書名與封
 
 | 頁面 | 功能 |
 | --- | --- |
-| 資料夾 | 頂部下拉選單切換「全部」「未分類」與自建資料夾（顯示本數）；封面牆（虛擬捲動，可調 2–5 欄），封面下方固定兩行書名、左下角 ID；每個資料夾各自記住排序；點封面以 Custom Tab 開網頁；封面右上角「⋮」單本選單（完整英／日標題、複製 ID、分類、從此資料夾移除、重抓封面、刪除；找不到的書可「修改 ID」）；長按封面進入多選模式（全選、批次分類／移除／刪除，返回鍵退出）；佔位圖依狀態顯示「載入中／找不到這本／資料讀取失敗／封面失敗」 |
-| 新增 | 「先存、後查」：輸入 ID（純數字、`#228922`、全形＃、網址）→ 按「加入」只做本機動作（不發網路請求）→ 輸入框立刻清空；已在所選資料夾就提示、已收藏就只補資料夾；資料夾記住上次的選擇；下方「最近加入」清單隨背景補資料自動更新；從瀏覽器「分享」進來會自動填入 ID |
-| 設定 | 主題顏色、深淺色、語言（繁中／简中／English／日本語）、使用說明；CSV 匯出／匯入（換機用）、背景佇列、重抓缺少的封面、封面占用空間、清除封面快取（只清暫存，收藏的封面不刪）；進階：測試連線；連點「關於 → 版本」7 次開啟開發者模式，可修改站方端點、看最近 50 次抓取成功率、切換抓取方式、重設驗證 |
+| 資料夾 | 上方兩列搜尋與篩選：第一列「標籤／作者／社團」（可打字、勾選，多選為「且」；清單右上角「全部清除」）＋排序；第二列「作品名稱／備註／ID」文字搜尋（停止輸入 300 ms 後查詢）＋資料夾篩選（多選為「或」，「全部」「未分類」固定在最上方，自建資料夾按住 ≡ 拖曳排序，右上角「全部清除」回到「全部」）；有篩選時顯示「找到 N 本」與「清除全部篩選」；封面牆（虛擬捲動，可調 2–5 欄），封面下方固定兩行書名（可再多一行備註）、左下角 ID；每個資料夾各自記住排序（多選資料夾時用「全部」的排序）；點封面依「開啟網頁方式」以系統瀏覽器或 Custom Tab 開網頁；封面右上角「⋮」單本選單（完整英／日標題、單行備註、複製 ID、分類、從此資料夾移除、重抓封面、刪除；找不到的書可「修改 ID」）；長按封面進入多選模式（全選只選目前篩選結果、批次分類／移除／刪除，返回鍵退出）；佔位圖依狀態顯示「載入中／找不到這本／資料讀取失敗／封面失敗」 |
+| 新增 | 「先存、後查」：輸入 ID（純數字、`#228922`、全形＃、網址）→ 按「加入」只做本機動作（不發網路請求）→ 輸入框立刻清空；已在所選資料夾就提示、已收藏就只補資料夾；資料夾記住上次的選擇；下方「最近加入」清單（10–50 筆可設定）顯示所在資料夾、隨背景補資料自動更新，點整條開網頁、長按開「⋮」單本選單；從瀏覽器「分享」進來會自動填入 ID |
+| 設定 | 主題顏色、深淺色、語言（繁中／简中／English／日本語）、使用說明；開啟網頁方式（外部瀏覽器／App 內瀏覽器）、在封面下方顯示備註、最近加入顯示筆數；媽媽模式（套用頁面：收藏頁／最近加入；隱藏內容：封面換成固定淺灰方塊且不載入圖片、書名、備註；詳細設定預設收合）；CSV 匯出／匯入（換機用）、背景佇列、重抓缺少的封面、封面占用空間、清除封面快取（只清暫存，收藏的封面不刪）；進階：測試連線；連點「關於 → 版本」7 次開啟開發者模式，可修改站方端點、看最近 50 次抓取成功率、切換抓取方式、重設驗證 |
 | 驗證畫面 | 站方開啟 Cloudflare 安全驗證時，App 會先在背景 WebView 自動嘗試；過不了才在提示列出現「進行驗證」按鈕，開啟全螢幕驗證畫面讓你手動完成，通過後背景佇列自動續跑 |
 
 ## 資料來源：nhentai API v2
@@ -38,14 +38,25 @@ App 直接向站方的公開 API v2 取資料，不經任何自建伺服器、�
 - 本地外掛 `nh-webfetch` 也負責接收分享：冷啟動時在 `load()` 讀 Intent，App 在背景時由 `handleOnNewIntent` 接收並發出 `shareReceived`；JS 以 `takeSharedText()` 取出（取出即清除）。只有 `nhSource.js` 使用這個外掛。
 - `extractGalleryId()` 從分享文字找出第一個 ID（`/g/{id}`、`#123456` 或整段數字），加入頁填入 ID、維持上次的資料夾，按「加入」即完成。
 
+## 搜尋與篩選（schema v3）
+
+- 三個條件的組合：`標籤（且）` **且** `資料夾（或）` **且** `文字`。WHERE 由 [`filter.js`](../src/services/filter.js)（純函式）的 `buildFilterWhere` 組出、全部參數化，`library.listBooks` 執行；列表查詢不 SELECT `book_raw`。
+- 文字搜尋比對 `books.title`（pretty）、`title_ja`、`title_en`、`note` 與 ID，`LIKE ? ESCAPE '\'`，使用者輸入的 `%`、`_`、`\` 會跳脫。
+- 標籤存在 `tags(id, type, name)`＋`book_tags(gallery_id, tag_id)`，存全部 7 種類型（tag、artist、group、parody、character、language、category），介面只顯示 tag／artist／group 且本數 > 0 的。解析在 `parse.js` 的 `parseSearchFields`（api-v1／api-v2 都支援，欄位缺少不崩潰）。
+- 新書：meta 工作者寫書名與 `book_raw` 的同一個交易裡一併寫 `title_en`、`tags`、`book_tags`。
+- 舊資料：遷移只建表；啟動後由 `library.backfillTags` 從 `book_raw` 本地分批（每批 100 本）回填，不上網，完成後記 `tags_backfilled = 1`。
+- 標籤選項清單只渲染前 200 筆（已勾選的排最上面，其他依本數多到少），其餘提示「繼續輸入以縮小範圍」。
+- 重開 App 後只保留資料夾篩選（設定鍵 `folder_filter`），文字與標籤每次清空。
+
 ## 實作重點
 
 - **轉接層**：所有對站方的請求與解析集中在 [`src/services/nhSource.js`](../src/services/nhSource.js)，對內只輸出固定的 BookMeta；端點範本存在 settings，可在設定頁修改。舊 API（`raw_format = api-v1`）的已存資料仍可解析。
 - **原生網路**：下載封面前一定先建立目標資料夾（`downloadFile` 不會自己建立）；詳情先走 `CapacitorHttp`（帶 `NH-Shelfie/<版本> (+https://github.com/anson669989/NH-Shelfie)` User-Agent）；被 Cloudflare 擋下時改用本地外掛 [`plugins/nh-webfetch`](../plugins/nh-webfetch) 的獨立 WebView（不接 Capacitor bridge，回傳通道只對 `https://nhentai.net` 開放）在站方頁面內抓 API。封面用 `Filesystem.downloadFile` 原生下載到快取目錄（不經 base64 橋接），成功後搬進 `covers/`。
 - **不留半套資料**：新書與資料夾關聯一個交易寫入；詳情與 `book_raw` 一個交易寫入；封面先存檔再更新資料庫，失敗或書已被刪就刪檔。啟動時清掉孤兒封面檔。
-- **資料模型**：SQLite（`books`、`book_raw`、`folders`、`book_folders`、`settings`、`fetch_log`），`raw_json` 獨立存放並以 `raw_format` 標版本，日後做標籤搜尋（路線 B）可直接本地解析、不必重抓。schema 以 `PRAGMA user_version` 逐版遷移，遷移前自動備份。v2 新增 `books.queue_seq` 與新的 `fetch_status` 值（`meta_pending`、`cover_pending`、`not_found`、`meta_failed`），舊的 `pending` 自動轉換。
+- **資料模型**：SQLite（`books`、`book_raw`、`folders`、`book_folders`、`tags`、`book_tags`、`settings`、`fetch_log`），`raw_json` 獨立存放並以 `raw_format` 標版本，可直接本地解析、不必重抓。schema 以 `PRAGMA user_version` 逐版遷移，遷移前自動備份。v2 新增 `books.queue_seq` 與新的 `fetch_status` 值（`meta_pending`、`cover_pending`、`not_found`、`meta_failed`），舊的 `pending` 自動轉換。v3 新增 `tags`、`book_tags`（`tag_id` 索引）與 `books.title_en`；刪除書時一併刪 `book_tags`。備註存在 `books.note`（⋮ 選單編輯，單行、不限長度），資料夾順序存在 `folders.sort_order`（拖曳放開時一個交易全部更新，失敗回滾並還原畫面）。
+- **開啟網頁**：設定 `open_mode`：`external`（預設，本地外掛 `nh-webfetch` 的 `openExternal`，Java 端再檢查 https＋nhentai 網域）或 `custom_tab`。預設外部瀏覽器，是因為 MainActivity 是 `singleTask`，從 Custom Tab 分享回 App 時會把 Custom Tab 清掉。開不起來就複製連結。
 - **安全**：所有外部文字一律純文字渲染（不使用 `v-html`）；CSP 只允許自身腳本與本機圖片；只允許 HTTPS、請求只送往白名單網域；ID 先轉整數再套範本，封面網址只接受 `*.nhentai.net` 的 CDN 伺服器與符合格式的 `cover.path`；封面以檔頭驗證 JPG／PNG／WebP、上限 5 MB；全部參數化查詢；CSV 匯出防公式注入；只申請 `INTERNET` 權限；關閉 `allowBackup`；封面目錄放 `.nomedia`。
-- **Android 細節**：safe-area insets 處理 Android 15 edge-to-edge；返回鍵順序：關彈窗 → 退出多選 → 回資料夾頁 → 再按一次才離開。
+- **Android 細節**：safe-area insets 處理 Android 15 edge-to-edge；返回鍵順序：關彈窗 → 收合標籤清單／退出多選 → 回資料夾頁 → 再按一次才離開。
 - **語言**：字串在 [`src/locales.js`](../src/locales.js)（繁中／简中／English／日本語），`tests/locales.test.js` 檢查四語鍵一致；手機語言 zh-CN／zh-Hans／zh-SG 自動用简中，zh-TW／zh-HK／zh-Hant 用繁中。
 
 ## 已知限制
@@ -54,11 +65,12 @@ App 直接向站方的公開 API v2 取資料，不經任何自建伺服器、�
 - 匿名每分鐘 20 次的限制下，大量加入或 CSV 匯入後補資料比較慢（每本約 3 秒；封面另走圖片隊伍）。
 - 站方若開啟 Cloudflare 驗證，需要在 App 內手動完成一次驗證畫面。
 - 背景佇列只在前景執行（不新增 Android 權限、不用背景服務）。
+- 還在「待補資料」的書沒有標籤，補完資料後才搜得到；升級到 v3 後，舊資料的標籤在啟動後數秒內回填完成前，選項可能不完整。
 - 沒有桌面預覽：資料庫與檔案功能只在 Android 上運作。
 
 ## 尚未包含（依里程碑之後再做）
 
-- M4 詳情頁（標籤顯示＋個人備註）、M5 路線 B（標籤搜尋與篩選）
+- （已取消）M4 詳情頁與標籤顯示：點封面一律直接開網頁，備註改在 ⋮ 單本選單編輯；標籤只做搜尋與篩選（v0.3.0 已完成）
 - Cloudflare 備援方案 3（手動指定封面）
 - 隱藏最近使用畫面（FLAG_SECURE）、App 開啟鎖、自動覆寫 CSV 到指定資料夾
 - iOS 版
@@ -113,7 +125,7 @@ git push origin v0.1.0
 
 ```bash
 npm install
-npm test                 # 單元測試（ID 解析、加入判斷、站方回應解析、CSV、四語鍵一致、封面下載流程）
+npm test                 # 單元測試（ID 解析、加入判斷、站方回應解析、標籤解析與篩選、CSV、四語鍵一致、封面下載流程）
 npm run android:prepare  # 建置網頁 → 產生 android/ → 套用設定 → 同步
 npm run android:open     # 用 Android Studio 開啟，接手機執行
 ```
@@ -133,8 +145,12 @@ index.html                       含 CSP
 src/
   App.vue                        底部三格導覽、返回鍵、前景佇列、接收分享
   components/
-    FoldersPage.vue              資料夾頁（多選模式、⋮ 單本選單）
-    CoverGrid.vue                虛擬捲動封面牆（書名、⋮、選取標記）
+    FoldersPage.vue              資料夾頁（搜尋與篩選、多選模式、⋮ 單本選單）
+    TagFilter.vue                標籤／作者／社團篩選（可打字的輸入框＋勾選清單）
+    CoverGrid.vue                虛擬捲動封面牆（書名、備註、⋮、選取標記、媽媽模式）
+    bookActions.js               ⋮ 單本選單與開網頁（資料夾頁、最近加入共用）
+    viewOptions.js               顯示備註／媽媽模式（純函式）
+    dragSort.js                  資料夾拖曳排序（Pointer Events）
     AddPage.vue                  新增頁（先存、後查、最近加入）
     QueueBanner.vue              背景佇列提示（429、網路、驗證、錯誤）
     bookStatus.js                書的狀態 → 佔位圖文字
@@ -145,7 +161,7 @@ src/
     library.js                   書籍／資料夾／背景佇列／CSV／健康檢查
     db.js                        SQLite 連線與 schema 遷移
     settings.js                  設定鍵值與預設端點
-    parse.js / csv.js / errors.js / addPlan.js / settingsMigration.js  純函式（可單元測試）
+    parse.js / csv.js / errors.js / addPlan.js / filter.js / settingsMigration.js  純函式（可單元測試）
   locales.js                     繁中／简中／英／日字串（純資料）
   i18n.js                        t()／errText()／語言偵測
 tests/                           Vitest 單元測試
