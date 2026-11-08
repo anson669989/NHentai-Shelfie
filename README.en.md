@@ -21,19 +21,25 @@
 
 ## ✨ Features
 
-- 🔒 **Local collection, no account**: everything stays on your phone.
-- ⚡ **Add without waiting**: type an ID and tap Add — title and cover are filled in automatically in the background.
-- 🔢 **Paste the ID any way**: plain numbers, `#228922` or a URL all work.
-- 🔗 **Add from the browser's Share menu**: tap Share on a page → NH Shelfie, and the ID is filled in.
-- 📁 **Folders**: put an item in several folders; each folder remembers its own sort order; hold ≡ and drag to reorder folders.
-- 🔍 **Search and tag filters**: search by title, note or ID; tick tags, artists and groups to filter; pick several folders at once.
-- 📝 **Notes**: write a one-line note in the "⋮" menu and optionally show it under the cover.
-- 🙈 **Privacy mode**: turn covers into plain grey boxes (and optionally hide titles and notes) so nobody gets an awkward glance at your screen.
-- 🌐 **Choose how pages open**: tap a cover to open it in your system browser or the in-app browser.
-- ☑️ **Multi-select**: long-press a cover to select many, then add to folders, remove or delete at once.
-- ⋮ **Item menu**: the button at the top-right of each cover shows full titles, lets you write a note, copies the ID and re-fetches the cover; long-press an item in "Recently added" to open it too.
-- 🌏 **Four languages**: 繁體中文, 简体中文, English, 日本語.
-- 💾 **Export for backup**: export a CSV and import it on a new phone.
+### ⚡ Quick saving
+- **Any ID format works**: plain numbers, `#228922`, or a full URL
+- **Add from your browser**: tap "Share" on a gallery page and pick NH Shelfie. The ID is filled in for you
+
+### 📁 Organize & search
+- **Folders**: put one book in several folders
+- **Search**: find books by title, note, or ID
+- **Tag filters**: filter by nhentai tag, artist, or group
+- **Multi-select**: long-press a cover to sort, remove, or delete several books at once
+- **Notes**: add a note to any book and optionally show it under the cover
+
+### 🔒 Privacy
+- **Stored on your phone, no account needed**: all data stays on your phone
+- **Mom mode**: replaces covers with plain light gray, and can also hide titles and notes
+
+### 🛠️ More
+- **Four languages**: 繁體中文, 简体中文, English, 日本語
+- **Choose how links open**: external browser or in-app browser
+- **Export backup**: export to CSV and import it on a new phone in one step
 
 
 ## 📱 Screenshots
