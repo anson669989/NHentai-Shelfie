@@ -86,6 +86,7 @@ export async function pickFoldersDialog(title, items, preselected = []) {
  * @param {{getSelected:()=>Promise<number[]>|number[], toggle:(id:number)=>Promise<number[]>|number[], onCreated:(id:number)=>any}} opts
  */
 export async function liveFolderSheet(title, { getSelected, toggle, onCreated }) {
+  const scroll = { top: 0 } // 新增資料夾後重開時停在原本的位置
   for (;;) {
     let items
     let selected
@@ -99,7 +100,7 @@ export async function liveFolderSheet(title, { getSelected, toggle, onCreated })
     const r = await actionSheet(
       title,
       [...buildFolderRows(items, t), { divider: true }, { label: '＋ ' + t('folder.new'), value: '__new' }],
-      { tall: true, multi: { selected, toggle } },
+      { tall: true, multi: { selected, toggle }, scroll },
     )
     if (r !== '__new') return
     try {

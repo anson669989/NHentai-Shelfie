@@ -70,13 +70,15 @@ export const promptDialog = (title, { value = '', placeholder = '', maxlength = 
  *   multi：多選模式。帶 check: true 的列顯示勾選框，點了呼叫 multi.toggle(value) 換成回傳的勾選結果、選單不關；
  *     有 multi.clear 時標題列右邊出現「全部清除」；最下方的按鈕變成「完成」
  *   headAction：標題列右側的灰色小圖示鈕（目前只有 refresh），點了關閉選單並回傳 headAction.value
+ *   scroll：捲動位置記憶 `{ top: 0 }`（呼叫端建立一次）。選單捲動時寫入 top、開啟時捲回 top——
+ *     「改名／新增後重開同一個選單」的迴圈傳同一個物件，就會停在原本的位置，不會跳回最上方
  * @returns {Promise<any|{more:any}|false>}
  */
 export const actionSheet = (
   title,
   actions,
-  { tall = false, lines = [], note = null, onReorder = null, multi = null, headAction = null } = {},
-) => open('sheet', { title, actions, tall, lines: lines.filter(Boolean), note, onReorder, multi, headAction })
+  { tall = false, lines = [], note = null, onReorder = null, multi = null, headAction = null, scroll = null } = {},
+) => open('sheet', { title, actions, tall, lines: lines.filter(Boolean), note, onReorder, multi, headAction, scroll })
 
 /**
  * 多選清單

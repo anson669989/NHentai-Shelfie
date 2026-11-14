@@ -62,7 +62,11 @@
           </button>
         </div>
         <!-- 內容（會捲動）：完整書名、備註、所有動作列 -->
-        <div class="sheet-body">
+        <div
+          class="sheet-body"
+          @scroll="d.scroll && (d.scroll.top = $event.target.scrollTop)"
+          @vue:mounted="({ el }) => restoreScroll(el, d)"
+        >
           <p v-for="(line, i) in d.lines" :key="'l' + i" class="sheet-line">{{ line }}</p>
           <!-- 單行備註：不限長度，離開輸入框自動儲存；Enter 只收起鍵盤 -->
           <label v-if="d.note" class="sheet-note">
@@ -177,6 +181,16 @@ function onDragStart(e, d) {
         toast(errText(err))
       })
     },
+  })
+}
+
+/** 重開同一個選單時捲回上次的位置（d.scroll 由呼叫端建立、跨次開啟共用）；版面可能下一幀才算好，所以再補一次 */
+function restoreScroll(el, d) {
+  const top = d.scroll?.top
+  if (!top) return
+  el.scrollTop = top
+  requestAnimationFrame(() => {
+    if (el.scrollTop !== top) el.scrollTop = top
   })
 }
 

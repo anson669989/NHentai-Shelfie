@@ -320,7 +320,11 @@ async function batchDelete() {
 
 // ---- 資料夾篩選（多選「或」）：勾選即時套用、選單不關；右上角「全部清除」回到「全部」 ----
 // 使用者資料夾與分隔線可在這裡直接拖曳排序（≡）、改名或刪除（⋯）；結果和「管理資料夾」同步
-async function openPicker() {
+function openPicker() {
+  return folderPicker({ top: 0 })
+}
+/** scroll：捲動位置記憶；管理資料夾、改名、刪除後重開時傳同一個，停在原本的位置 */
+async function folderPicker(scroll) {
   const row = (key, label) => ({ label: `${label} (${countOf(key)})`, value: key, check: true })
   let items = []
   try {
@@ -342,6 +346,7 @@ async function openPicker() {
     ],
     {
       tall: true,
+      scroll,
       // 按住 ≡ 拖曳排序，放開才寫入；資料夾列的 value 是數字 id，分隔線是 's:ID'
       onReorder: (values) => reorderFolderItems(values.map((v) => (typeof v === 'number' ? 'f:' + v : v))),
       multi: {
@@ -361,13 +366,13 @@ async function openPicker() {
   if (action === '__manage') {
     await openFolderManager()
     await reload().catch((e) => toast(errText(e)))
-    return openPicker()
+    return folderPicker(scroll)
   }
   if (action && typeof action === 'object' && 'more' in action) {
     const key = typeof action.more === 'number' ? 'f:' + action.more : action.more
     if (await openFolderItemMenu(findItem(items, key))) {
       await reload().catch((e) => toast(errText(e))) // 先更新清單與本數，再重開選單，方便連續操作
-      openPicker()
+      folderPicker(scroll)
     }
   }
 }

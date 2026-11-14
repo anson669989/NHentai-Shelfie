@@ -19,6 +19,7 @@ import { buildFolderRows } from './folderRows.js'
 
 /** 設定頁「管理資料夾」：改完回到清單，關閉才離開 */
 export async function openFolderManager() {
+  const scroll = { top: 0 } // 改名、刪除、新增後重開時停在原本的位置
   for (;;) {
     let items, counts
     try {
@@ -36,7 +37,7 @@ export async function openFolderManager() {
         { label: '＋ ' + t('folder.new'), value: '__new' },
         { label: '＋ ' + t('sep.new'), value: '__sep' },
       ],
-      { tall: true, lines: [t('folder.manageHint')], onReorder: reorderFolderItems },
+      { tall: true, lines: [t('folder.manageHint')], onReorder: reorderFolderItems, scroll },
     )
     if (!action) return
     try {
