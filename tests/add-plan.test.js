@@ -67,6 +67,15 @@ describe('planAdd：按「加入」只做本機判斷', () => {
     expect(planAdd({ folderIds: [1] }, [1, 4])).toEqual({ kind: 'addFolders', toAdd: [4], originalFolderIds: [1] })
     expect(planAdd({ folderIds: [] }, [2])).toEqual({ kind: 'addFolders', toAdd: [2], originalFolderIds: [] })
   })
+  it('newOnly（未讀）：只對新書生效，已收藏的書不會被重新加進未讀', () => {
+    const opts = { newOnly: [7] }
+    expect(planAdd(null, [7, 3], opts)).toEqual({ kind: 'new', folderIds: [7, 3] })
+    expect(planAdd({ folderIds: [] }, [7], opts)).toEqual({ kind: 'already' })
+    expect(planAdd({ folderIds: [3] }, [7, 3], opts)).toEqual({ kind: 'already' })
+    expect(planAdd({ folderIds: [3] }, [7, 4], opts)).toEqual({ kind: 'addFolders', toAdd: [4], originalFolderIds: [3] })
+    // 本來就在未讀：維持原狀（不會被移除）
+    expect(planAdd({ folderIds: [7] }, [7], opts)).toEqual({ kind: 'already' })
+  })
   it('重複的資料夾 ID 只算一次', () => {
     expect(planAdd(null, [3, 3])).toEqual({ kind: 'new', folderIds: [3] })
   })

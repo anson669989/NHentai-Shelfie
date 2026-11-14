@@ -10,12 +10,14 @@
  *   - new：沒收藏過 → 新建一筆「待補資料」並放進所選資料夾
  *   - already：已在所選的每個資料夾（或沒選資料夾且已收藏）→ 不做任何事
  *   - addFolders：已收藏但不在部分所選資料夾 → 只補資料夾關聯，不重抓資料與封面
+ * @param {{newOnly?:number[]}} [opts] newOnly：只對新書生效的資料夾（「未讀」：已收藏的書不會被重新加進未讀）
  */
-export function planAdd(existing, selectedFolderIds = []) {
+export function planAdd(existing, selectedFolderIds = [], { newOnly = [] } = {}) {
   const selected = [...new Set((selectedFolderIds || []).map(Number).filter(Number.isFinite))]
   if (!existing) return { kind: 'new', folderIds: selected }
+  const skip = new Set((newOnly || []).map(Number))
   const have = new Set((existing.folderIds || []).map(Number))
-  const toAdd = selected.filter((id) => !have.has(id))
+  const toAdd = selected.filter((id) => !have.has(id) && !skip.has(id))
   if (!toAdd.length) return { kind: 'already' }
   return { kind: 'addFolders', toAdd, originalFolderIds: [...have] }
 }

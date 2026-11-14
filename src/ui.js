@@ -57,25 +57,31 @@ export const promptDialog = (title, { value = '', placeholder = '', maxlength = 
   open('prompt', { title, value, placeholder, maxlength, validate, error: '' })
 
 /**
- * 動作選單
+ * 動作選單：固定的標題列＋會捲動的內容＋固定在底部的「取消／完成」
  * 每列可帶：danger（紅字）、checked（列尾勾號）、more（右側「⋯」按鈕，點它 resolve { more: value }）、
  *   drag（左側 ≡ 拖曳把手，需搭配 more；可拖的列要相鄰）；
- * `{ divider: true }` 為分隔線。
- * @param {{label?:string, value?:any, danger?:boolean, checked?:boolean, more?:boolean, divider?:boolean}[]} actions
- * @param {{tall?:boolean, lines?:string[], note?:{value:string, label?:string, placeholder?:string, save?:(v:string)=>any}, onReorder?:(values:any[])=>any, multi?:{selected:any[], toggle:(value:any)=>any[]|Promise<any[]>, clear?:()=>any[]|Promise<any[]>, clearLabel?:string}}} [opts]
+ * `{ divider: true }` 為細分隔線；`{ separator: true, label }` 為使用者建立的分隔線（置中灰字、左右有線，
+ *   不可點、不可勾選；搭配 more／drag 時左邊有 ≡、右邊有 ⋯，可和資料夾列一起拖曳）。
+ * @param {{label?:string, value?:any, danger?:boolean, checked?:boolean, more?:boolean, drag?:boolean, divider?:boolean, separator?:boolean}[]} actions
+ * @param {{tall?:boolean, lines?:string[], note?:{value:string, label?:string, placeholder?:string, save?:(v:string)=>any}, onReorder?:(values:any[])=>any, multi?:{selected:any[], toggle:(value:any)=>any[]|Promise<any[]>, clear?:()=>any[]|Promise<any[]>, clearLabel?:string}, headAction?:{icon:'refresh', label:string, value:any}}} [opts]
  *   tall：最大高度 70vh、可捲動（長清單用）；lines：標題下方的純文字行（例如完整書名），可選取複製；
  *   note：單行備註輸入框（直接改 note.value；離開輸入框時呼叫 note.save；貼上的換行轉成空白）
  *   onReorder：拖曳放開後以新順序的 value 陣列呼叫；回傳的 Promise 失敗時畫面還原、顯示錯誤
  *   multi：多選模式。帶 check: true 的列顯示勾選框，點了呼叫 multi.toggle(value) 換成回傳的勾選結果、選單不關；
  *     有 multi.clear 時標題列右邊出現「全部清除」；最下方的按鈕變成「完成」
+ *   headAction：標題列右側的灰色小圖示鈕（目前只有 refresh），點了關閉選單並回傳 headAction.value
  * @returns {Promise<any|{more:any}|false>}
  */
-export const actionSheet = (title, actions, { tall = false, lines = [], note = null, onReorder = null, multi = null } = {}) =>
-  open('sheet', { title, actions, tall, lines: lines.filter(Boolean), note, onReorder, multi })
+export const actionSheet = (
+  title,
+  actions,
+  { tall = false, lines = [], note = null, onReorder = null, multi = null, headAction = null } = {},
+) => open('sheet', { title, actions, tall, lines: lines.filter(Boolean), note, onReorder, multi, headAction })
 
 /**
  * 多選清單
- * @param {{label:string, value:any}[]} items
+ * @param {({label:string, value:any}|{divider:true}|{separator:true, label:string})[]} items
+ *   divider：細分隔線；separator：使用者建立的分隔線（不可勾選）
  * @param {any[]} selected
  * @returns {Promise<any[]|null>}
  */

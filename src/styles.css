@@ -225,14 +225,22 @@ details.row[open] { gap: 8px; }
 .diag-title { margin: 4px 0 0; font-size: 14px; }
 .diag { margin: 0; max-height: 40vh; overflow: auto; padding: 8px; border-radius: 8px; background: var(--bg); font-size: 11px; line-height: 1.4; white-space: pre-wrap; word-break: break-all; user-select: text; -webkit-user-select: text; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 6px; align-items: center; margin-top: 6px; }
-.sheet { background: var(--surface); color: var(--text); border-radius: 16px; width: 100%; max-width: 520px; max-height: 80vh; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; }
+.sheet { background: var(--surface); color: var(--text); border-radius: 16px; width: 100%; max-width: 520px; max-height: 80vh; overflow: hidden; padding: 8px; display: flex; flex-direction: column; }
 .sheet-title { padding: 10px 12px; color: var(--muted); font-size: 14px; font-weight: 500; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
-/* 標題列：清單很長時也不會被擠扁（flex-shrink: 0），捲動時固定在頂端 */
-.sheet-head {
-  display: flex; align-items: center; flex-shrink: 0; position: sticky; top: 0; z-index: 3;
-  margin: -8px -8px 0; padding: 8px 8px 0; background: var(--surface);
-}
+/* 選單結構：固定的標題列 .sheet-head ＋ 會捲動的 .sheet-body ＋ 底部固定的取消／完成 */
+.sheet-head { display: flex; align-items: center; flex-shrink: 0; }
 .sheet-head .sheet-title { flex: 1; min-width: 0; }
+.sheet-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  display: flex; flex-direction: column;
+}
+/* 標題列右側的灰色小圖示鈕（例如重新載入），可點範圍 40×40 */
+.sheet-head-btn {
+  flex-shrink: 0; width: 40px; height: 40px; border: 0; background: none; color: var(--muted); border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.sheet-head-btn:active { background: var(--surface-2); }
+.sheet-head-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .sheet-clear { flex-shrink: 0; font-size: 14px; padding-top: 6px; padding-bottom: 6px; }
 /* 多選選單的勾選框 */
 .sheet-box {
@@ -243,7 +251,7 @@ details.row[open] { gap: 8px; }
 .sheet-box.on::after { content: '✓'; color: #fff; font-size: 13px; font-weight: 700; line-height: 1; }
 .sheet-line { margin: 0; padding: 0 12px 8px; font-size: 14px; line-height: 1.4; word-break: break-word; user-select: text; -webkit-user-select: text; flex-shrink: 0; }
 .sheet.tall { max-height: 70vh; }
-.sheet-item { border: 0; background: none; text-align: left; padding: 14px 12px; font-size: 16px; border-radius: 10px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.sheet-item { border: 0; background: none; text-align: left; padding: 14px 12px; font-size: 16px; line-height: 22px; border-radius: 10px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .sheet-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sheet-check { color: var(--primary); font-weight: 700; }
 .sheet-row { display: flex; align-items: center; flex-shrink: 0; }
@@ -260,9 +268,18 @@ details.row[open] { gap: 8px; }
   position: relative; z-index: 2; background: var(--surface); border-radius: 10px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
 }
-.sheet.drag-active { user-select: none; -webkit-user-select: none; }
-.sheet.drag-active .drag-handle { cursor: grabbing; }
+.sheet-body.drag-active { user-select: none; -webkit-user-select: none; }
+.sheet-body.drag-active .drag-handle { cursor: grabbing; }
 .sheet-divider { border: 0; border-top: 1px solid var(--border); margin: 4px 8px; flex-shrink: 0; }
+/* 使用者建立的分隔線：置中灰字、左右各一條線；沒有名稱時只有一條線。不可點、不可勾選 */
+.sheet-sep {
+  display: flex; align-items: center; min-height: 32px; padding: 0 12px; flex-shrink: 0;
+  color: var(--muted); font-size: 13px; user-select: none; -webkit-user-select: none;
+}
+.sheet-sep::before, .sheet-sep::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
+.sheet-sep-label { max-width: 70%; padding: 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 可拖曳的分隔線列：高度和資料夾列相同（14px×2 ＋ 22px），拖曳時讓位距離才正確 */
+.sheet-row .sheet-sep { flex: 1; min-width: 0; min-height: 50px; padding: 0 4px; }
 .sheet-item:active { background: var(--surface-2); }
 .sheet-item.danger { color: var(--error); }
 .sheet-item.cancel { text-align: center; color: var(--muted); }

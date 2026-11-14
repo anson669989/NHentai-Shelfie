@@ -42,67 +42,95 @@
 
       <!-- 動作選單 -->
       <div v-else-if="d.kind === 'sheet'" class="sheet" :class="{ tall: d.tall }">
-        <!-- 標題列（固定高度、不會被下方清單擠扁）；多選模式右上角有「全部清除」 -->
-        <div v-if="d.title || d.multi?.clear" class="sheet-head">
+        <!-- 標題列（固定、不捲動）：右側可有重新載入等小圖示鈕；多選模式有「全部清除」 -->
+        <div v-if="d.title || d.multi?.clear || d.headAction" class="sheet-head">
           <h3 class="sheet-title">{{ d.title }}</h3>
+          <button
+            v-if="d.headAction"
+            class="sheet-head-btn"
+            :aria-label="d.headAction.label"
+            :title="d.headAction.label"
+            @click="closeDialog(d, d.headAction.value)"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+              <path d="M20 4v5h-5" />
+            </svg>
+          </button>
           <button v-if="d.multi?.clear" class="btn text sheet-clear" @click="clearMulti(d)">
             {{ d.multi.clearLabel || t('filter.clear') }}
           </button>
         </div>
-        <p v-for="(line, i) in d.lines" :key="'l' + i" class="sheet-line">{{ line }}</p>
-        <!-- 單行備註：不限長度，離開輸入框自動儲存；Enter 只收起鍵盤 -->
-        <label v-if="d.note" class="sheet-note">
-          <span class="sheet-note-label">{{ d.note.label }}</span>
-          <input
-            v-model="d.note.value"
-            class="input"
-            type="text"
-            enterkeyhint="done"
-            autocomplete="off"
-            :placeholder="d.note.placeholder"
-            @paste="onNotePaste($event, d)"
-            @keydown.enter.prevent="$event.target.blur()"
-            @blur="d.note.save?.(d.note.value)"
-          />
-        </label>
-        <template v-for="(a, i) in d.actions" :key="i">
-          <hr v-if="a.divider" class="sheet-divider" />
-          <div v-else-if="a.more" class="sheet-row" :data-drag="a.drag ? '' : null">
-            <span
-              v-if="a.drag"
-              class="drag-handle"
-              role="button"
-              :aria-label="t('folder.dragHandle')"
-              @pointerdown="onDragStart($event, d)"
-              @contextmenu.prevent
-              >≡</span
-            >
-            <button class="sheet-item" :class="{ danger: a.danger }" @click="pick(d, a)">
+        <!-- 內容（會捲動）：完整書名、備註、所有動作列 -->
+        <div class="sheet-body">
+          <p v-for="(line, i) in d.lines" :key="'l' + i" class="sheet-line">{{ line }}</p>
+          <!-- 單行備註：不限長度，離開輸入框自動儲存；Enter 只收起鍵盤 -->
+          <label v-if="d.note" class="sheet-note">
+            <span class="sheet-note-label">{{ d.note.label }}</span>
+            <input
+              v-model="d.note.value"
+              class="input"
+              type="text"
+              enterkeyhint="done"
+              autocomplete="off"
+              :placeholder="d.note.placeholder"
+              @paste="onNotePaste($event, d)"
+              @keydown.enter.prevent="$event.target.blur()"
+              @blur="d.note.save?.(d.note.value)"
+            />
+          </label>
+          <template v-for="(a, i) in d.actions" :key="i">
+            <hr v-if="a.divider" class="sheet-divider" />
+            <!-- 使用者建立的分隔線（不可點、不可勾選） -->
+            <div v-else-if="a.separator && !a.more" class="sheet-sep">
+              <span v-if="a.label" class="sheet-sep-label">{{ a.label }}</span>
+            </div>
+            <div v-else-if="a.more" class="sheet-row" :data-drag="a.drag ? '' : null">
+              <span
+                v-if="a.drag"
+                class="drag-handle"
+                role="button"
+                :aria-label="t('folder.dragHandle')"
+                @pointerdown="onDragStart($event, d)"
+                @contextmenu.prevent
+                >≡</span
+              >
+              <div v-if="a.separator" class="sheet-sep">
+                <span v-if="a.label" class="sheet-sep-label">{{ a.label }}</span>
+              </div>
+              <button v-else class="sheet-item" :class="{ danger: a.danger }" @click="pick(d, a)">
+                <span v-if="isMulti(d, a)" class="sheet-box" :class="{ on: isChecked(d, a) }" aria-hidden="true" />
+                <span class="sheet-label">{{ a.label }}</span>
+                <span v-if="!isMulti(d, a) && a.checked" class="sheet-check">✓</span>
+              </button>
+              <button class="sheet-more" :aria-label="t('folder.more')" @click="closeDialog(d, { more: a.value })">⋯</button>
+            </div>
+            <button v-else class="sheet-item" :class="{ danger: a.danger }" @click="pick(d, a)">
               <span v-if="isMulti(d, a)" class="sheet-box" :class="{ on: isChecked(d, a) }" aria-hidden="true" />
               <span class="sheet-label">{{ a.label }}</span>
               <span v-if="!isMulti(d, a) && a.checked" class="sheet-check">✓</span>
             </button>
-            <button class="sheet-more" :aria-label="t('folder.more')" @click="closeDialog(d, { more: a.value })">⋯</button>
-          </div>
-          <button v-else class="sheet-item" :class="{ danger: a.danger }" @click="pick(d, a)">
-            <span v-if="isMulti(d, a)" class="sheet-box" :class="{ on: isChecked(d, a) }" aria-hidden="true" />
-            <span class="sheet-label">{{ a.label }}</span>
-            <span v-if="!isMulti(d, a) && a.checked" class="sheet-check">✓</span>
-          </button>
-        </template>
+          </template>
+        </div>
         <button class="sheet-item cancel" @click="closeDialog(d, false)">
           {{ d.multi ? t('filter.done') : t('common.cancel') }}
         </button>
       </div>
 
-      <!-- 多選清單 -->
+      <!-- 多選清單（項目可含 { divider: true } 與分隔線 { separator: true, label }） -->
       <div v-else-if="d.kind === 'checklist'" class="sheet">
         <h3 class="sheet-title">{{ d.title }}</h3>
         <div class="checklist">
-          <label v-for="it in d.items" :key="it.value" class="check-row">
-            <input v-model="d.selected" type="checkbox" :value="it.value" />
-            <span>{{ it.label }}</span>
-          </label>
+          <template v-for="(it, i) in d.items" :key="i">
+            <hr v-if="it.divider" class="sheet-divider" />
+            <div v-else-if="it.separator" class="sheet-sep">
+              <span v-if="it.label" class="sheet-sep-label">{{ it.label }}</span>
+            </div>
+            <label v-else class="check-row">
+              <input v-model="d.selected" type="checkbox" :value="it.value" />
+              <span>{{ it.label }}</span>
+            </label>
+          </template>
         </div>
         <div class="dialog-actions">
           <button v-if="d.extraAction" class="btn text" @click="runExtra(d)">{{ d.extraAction.label }}</button>
@@ -128,7 +156,7 @@ import { startDragSort, moveItem } from './dragSort.js'
 
 /** 動作選單裡可拖曳的列（a.drag）：按住 ≡ 拖曳，放開後先改畫面，再交給 d.onReorder 寫入；失敗就還原 */
 function onDragStart(e, d) {
-  const container = e.currentTarget.closest('.sheet')
+  const container = e.currentTarget.closest('.sheet-body')
   const rows = [...container.querySelectorAll('[data-drag]')]
   const from = rows.indexOf(e.currentTarget.closest('[data-drag]'))
   startDragSort(e, {

@@ -53,7 +53,7 @@ Capacitor + Vue 3 的 Android App：輸入 gallery ID，背景抓書名與封面
 
 ## 加入流程：「先存、後查」
 
-- 按「加入」（`library.quickAdd`）**完全不發網路請求**：檢查 ID 格式 → 查本機 → `planAdd()` 決定 `already`（已在所選資料夾，提示）／`addFolders`（已收藏，只補資料夾，不重抓）／`new`（寫入 `meta_pending`）。三種情況都清空輸入框。書是否存在於網站一律由背景佇列判斷
+- 按「加入」（`library.quickAdd`）**完全不發網路請求**：檢查 ID 格式 → 查本機 → `planAdd()` 決定 `already`（已在所選資料夾，提示）／`addFolders`（已收藏，只補資料夾，不重抓；已收藏的書不會被重新加進「未讀」＝`planAdd` 的 `newOnly`）／`new`（寫入 `meta_pending`）。三種情況都清空輸入框。書是否存在於網站一律由背景佇列判斷
 - 背景佇列就是 `books.fetch_status` ＋ `queue_seq`（加入毫秒，排隊順序），存在資料庫，App 重開後繼續；只在前景執行，回到前景或網路恢復自動續跑
 - 狀態：`meta_pending`（待補資料）→ `cover_pending`（有書名、待抓封面）→ `ok`；失敗：`not_found`（404，⋮ 可「修改 ID」）、`meta_failed`（格式不符）、`no_cover`（封面失敗，⋮ 可「重抓封面」）
 - 網路失敗（離線／逾時／被擋）留在佇列 30 秒後自動重試；需要驗證時暫停並在提示列顯示「進行驗證」；寫檔／空間／資料庫錯誤停下並顯示

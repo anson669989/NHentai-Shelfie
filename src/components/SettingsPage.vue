@@ -85,6 +85,14 @@
         </div>
       </div>
 
+      <!-- 資料夾：排序、改名、刪除與分隔線（收藏頁的資料夾篩選選單也能做，兩邊同步） -->
+      <h2>{{ t('settings.folders') }}</h2>
+      <div class="card">
+        <div class="row">
+          <button class="btn block" @click="openFolderManager">{{ t('folder.manage') }}</button>
+        </div>
+      </div>
+
       <!-- 媽媽模式：只能在這裡切換 -->
       <h2>{{ t('settings.mama') }}</h2>
       <div class="card">
@@ -258,6 +266,7 @@ import { validateEndpointTemplate, RECENT_LIMITS, normalizeRecentLimit } from '.
 import { AppError, E, toAppError } from '../services/errors.js'
 import { t, errText, LANGUAGES, currentLang } from '../i18n.js'
 import { alertDialog, confirmDialog, toast, formatBytes } from '../ui.js'
+import { openFolderManager } from './folderManager.js'
 
 const props = defineProps({ active: Boolean })
 /** 媽媽模式「詳細設定」是否展開（不記住，每次進設定頁都收合） */

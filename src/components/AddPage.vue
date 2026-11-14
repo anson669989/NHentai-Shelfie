@@ -89,6 +89,7 @@ import {
   getBookFolders,
   quickAdd,
   listFolders,
+  listFolderItems,
   listRecentBooks,
   createFolder,
   coverSrc,
@@ -102,7 +103,7 @@ import { checklistDialog, promptDialog, toast } from '../ui.js'
 import { statusKey, isLoadingStatus } from './bookStatus.js'
 import { openBook, openBookMenu } from './bookActions.js'
 import { viewOptions } from './viewOptions.js'
-import { folderLabel, bookFolderLabels } from './folderRows.js'
+import { bookFolderLabels, buildFolderRows } from './folderRows.js'
 
 const props = defineProps({ active: Boolean })
 
@@ -191,23 +192,26 @@ function onPaste() {
 }
 
 async function pickFolders() {
-  const picked = await checklistDialog(
-    t('add.folders'),
-    folders.value.map((f) => ({ label: folderLabel(f, t), value: f.id })),
-    selected.value,
-    {
-      extraAction: {
-        label: '＋ ' + t('folder.new'),
-        run: async () => {
-          const added = await promptNewFolder()
-          return added ? { label: added.name, value: added.id } : null
-        },
+  let items = []
+  try {
+    items = await listFolderItems()
+  } catch (err) {
+    toast(errText(err))
+    return
+  }
+  // 含未讀、典藏與分隔線，順序和管理資料夾一致；只回傳資料夾 id
+  const picked = await checklistDialog(t('add.folders'), buildFolderRows(items, t), selected.value, {
+    extraAction: {
+      label: '＋ ' + t('folder.new'),
+      run: async () => {
+        const added = await promptNewFolder()
+        return added ? { label: added.name, value: added.id } : null
       },
     },
-  )
+  })
   if (picked) {
-    selected.value = picked
-    await setSetting('last_folders', JSON.stringify(picked))
+    selected.value = picked.filter((v) => typeof v === 'number')
+    await setSetting('last_folders', JSON.stringify(selected.value))
     checkDuplicate()
   }
 }
@@ -242,7 +246,7 @@ async function submit() {
   try {
     const r = await quickAdd(id, selected.value)
     if (r.kind === 'new') toast(t('add.added', { id }))
-    else if (r.kind === 'already') toast(t('add.alreadyHere', { id }))
+    else if (r.kind === 'already') toast(t('add.alreadyHere', { id, names: folderNames(r.originalFolders) }))
     else toast(t('add.addedExisting', { id, names: folderNames(r.originalFolders) }))
     raw.value = ''
     dup.value = null

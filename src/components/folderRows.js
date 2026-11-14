@@ -2,12 +2,15 @@
 // 系統資料夾（未讀、典藏）在資料庫裡的 name 只是佔位字串，任何畫面都不可直接顯示——一律經 folderLabel。
 
 const SYSTEM_LABEL = { unread: 'folder.unread', fav: 'folder.fav' }
+// 系統資料夾名稱前的圖示（寫在程式裡、不放進 locales.js）
+const SYSTEM_ICON = { fav: '⭐ ' }
 
-/** 資料夾顯示名稱：未讀／典藏取翻譯，其他用自己的名稱 */
+const systemName = (kind, t) => (SYSTEM_ICON[kind] || '') + t(SYSTEM_LABEL[kind])
+
+/** 資料夾顯示名稱：未讀／典藏取翻譯（典藏前面加 ⭐），其他用自己的名稱 */
 export function folderLabel(folder, t) {
   if (!folder) return ''
-  const key = SYSTEM_LABEL[folder.kind]
-  return key ? t(key) : String(folder.name ?? '')
+  return SYSTEM_LABEL[folder.kind] ? systemName(folder.kind, t) : String(folder.name ?? '')
 }
 
 /**
@@ -22,8 +25,7 @@ export function bookFolderLabels(folders, t) {
   const user = list.filter((f) => !SYSTEM_LABEL[kindOf(f)])
   const out = []
   if (!user.length) out.push(t('folder.uncat'))
-  if (list.some((f) => kindOf(f) === 'unread')) out.push(t('folder.unread'))
-  if (list.some((f) => kindOf(f) === 'fav')) out.push(t('folder.fav'))
+  for (const kind of ['unread', 'fav']) if (list.some((f) => kindOf(f) === kind)) out.push(systemName(kind, t))
   for (const f of user) out.push(String(f.name ?? ''))
   return out
 }
@@ -32,6 +34,7 @@ export function bookFolderLabels(folders, t) {
  * listFolderItems() 的結果 → 選單列（actionSheet／checklist 共用）。
  * - 資料夾：{ label, value: id, check: true }；opts.counts 有給就在名稱後加 (n)
  * - 分隔線：{ separator: true, label, value: 's:ID' }
+ * - 系統資料夾（未讀、典藏）與後面的使用者資料夾之間自動加一條 { divider: true }（兩邊都有項目時）
  * - opts.sortable：使用者資料夾與分隔線都多帶 more、drag（≡ 拖曳、⋯ 選單）；系統資料夾永遠不帶
  * - opts.keyValues：資料夾的 value 改用項目鍵 'f:ID'、不帶 check（管理資料夾用）
  * @param {{type:string, key:string, id:number, name:string, kind?:string}[]} items
@@ -41,8 +44,11 @@ export function bookFolderLabels(folders, t) {
 export function buildFolderRows(items, t, opts = {}) {
   const counts = opts.counts?.byFolder ?? opts.counts ?? null
   const rows = []
+  let prevSystem = false
   for (const it of items || []) {
     const system = !!SYSTEM_LABEL[it.kind]
+    if (prevSystem && !system) rows.push({ divider: true }) // 分開系統資料夾與自建資料夾
+    prevSystem = system
     const movable = !!opts.sortable && !system
     if (it.type === 'separator') {
       rows.push({ separator: true, label: String(it.name ?? ''), value: it.key, ...(movable ? { more: true, drag: true } : {}) })

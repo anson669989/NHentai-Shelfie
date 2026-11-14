@@ -2,7 +2,7 @@
 // 只呼叫服務層；選單本身由 DialogHost 的 actionSheet 顯示。
 import {
   createFolder,
-  listFolders,
+  listFolderItems,
   getBook,
   getBookFolders,
   getBookTitles,
@@ -19,7 +19,7 @@ import { normalizeNote, parseGalleryId } from '../services/parse.js'
 import { AppError, E } from '../services/errors.js'
 import { t, errText } from '../i18n.js'
 import { actionSheet, confirmDialog, promptDialog, checklistDialog, toast } from '../ui.js'
-import { folderLabel } from './folderRows.js'
+import { folderLabel, buildFolderRows } from './folderRows.js'
 
 /** 依設定「開啟網頁方式」開該本網頁；開不起來就複製連結並提示 */
 export async function openBook(book) {
@@ -50,7 +50,10 @@ export async function copyId(id) {
   }
 }
 
-/** 勾選資料夾（可在清單內「＋ 新增資料夾」） */
+/**
+ * 勾選資料夾（可在清單內「＋ 新增資料夾」）；items 用 buildFolderRows 產生（含分隔線）。
+ * 回傳的陣列只含資料夾 id（數字）。
+ */
 export async function pickFoldersDialog(title, items, preselected = []) {
   return checklistDialog(title, items, preselected, {
     extraAction: {
@@ -66,7 +69,7 @@ export async function pickFoldersDialog(title, items, preselected = []) {
         return name != null && id ? { label: name.trim(), value: id } : null
       },
     },
-  })
+  }).then((picked) => picked && picked.filter((v) => typeof v === 'number'))
 }
 
 /**
@@ -127,12 +130,8 @@ export async function openBookMenu(book, { currentFolder = null } = {}) {
     else if (action === 'changeId') await changeId(book)
     else if (action === 'folders') {
       const before = (await getBookFolders(id)).map((x) => x.id)
-      const folders = await listFolders()
-      const picked = await pickFoldersDialog(
-        t('book.classify'),
-        folders.map((x) => ({ label: folderLabel(x, t), value: x.id })),
-        before,
-      )
+      const items = await listFolderItems()
+      const picked = await pickFoldersDialog(t('book.classify'), buildFolderRows(items, t), before)
       if (picked) await setBookFolders(id, picked)
     } else if (action === 'remove') {
       await removeBooksFromFolder([id], f.id)

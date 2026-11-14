@@ -99,10 +99,7 @@ import {
   getSortMode,
   setSortMode,
   SORT_MODES,
-  createFolder,
-  renameFolder,
-  deleteFolder,
-  reorderFolders,
+  reorderFolderItems,
   addBooksToFolders,
   removeBooksFromFolder,
   deleteBooks,
@@ -116,11 +113,11 @@ import {
   normalizeSearchText,
 } from '../services/filter.js'
 import { t, errText } from '../i18n.js'
-import { actionSheet, confirmDialog, promptDialog, toast, pushBackHandler } from '../ui.js'
+import { actionSheet, confirmDialog, toast, pushBackHandler } from '../ui.js'
 import { openBook, openBookMenu, pickFoldersDialog } from './bookActions.js'
 import { viewOptions } from './viewOptions.js'
 import { folderLabel, buildFolderRows } from './folderRows.js'
-import { isSystemKind } from '../services/folderOrder.js'
+import { openFolderManager, openFolderItemMenu, newFolderPrompt, findItem } from './folderManager.js'
 
 const props = defineProps({ active: Boolean })
 
@@ -272,11 +269,16 @@ function exitSelect() {
 
 async function batchClassify() {
   const ids = [...selected.value]
-  const others = folders.value.filter((f) => f.id !== currentFolder.value?.id)
-  const picked = await pickFoldersDialog(
-    t('select.classifyTitle', { n: ids.length }),
-    others.map((f) => ({ label: folderLabel(f, t), value: f.id })),
-  )
+  let items = []
+  try {
+    items = await listFolderItems()
+  } catch (err) {
+    toast(errText(err))
+    return
+  }
+  // 排除目前所在的資料夾；含未讀、典藏與分隔線（順序和管理資料夾一致）
+  const others = items.filter((x) => !(x.type === 'folder' && x.id === currentFolder.value?.id))
+  const picked = await pickFoldersDialog(t('select.classifyTitle', { n: ids.length }), buildFolderRows(others, t))
   if (!picked?.length) return
   try {
     await addBooksToFolders(ids, picked)
@@ -317,6 +319,7 @@ async function batchDelete() {
 }
 
 // ---- 資料夾篩選（多選「或」）：勾選即時套用、選單不關；右上角「全部清除」回到「全部」 ----
+// 使用者資料夾與分隔線可在這裡直接拖曳排序（≡）、改名或刪除（⋯）；結果和「管理資料夾」同步
 async function openPicker() {
   const row = (key, label) => ({ label: `${label} (${countOf(key)})`, value: key, check: true })
   let items = []
@@ -326,27 +329,21 @@ async function openPicker() {
     toast(errText(e))
     return
   }
-  // 最上方固定四列：全部、未分類、未讀、典藏（沒有 ≡／⋯）；其後使用者資料夾可拖曳、改名、刪除
-  const sysItems = items.filter((x) => x.type === 'folder' && isSystemKind(x.kind))
-  const userRows = buildFolderRows(
-    items.filter((x) => !sysItems.includes(x)),
-    t,
-    { counts: counts.value, sortable: true },
-  )
+  // 最上方固定四列：全部、未分類、未讀、典藏（沒有 ≡／⋯），之後自動接一條分隔線與可拖曳的使用者資料夾、分隔線
   const action = await actionSheet(
     t('filter.folderTitle'),
     [
       row('all', t('folder.all')),
       row('uncat', t('folder.uncat')),
-      ...buildFolderRows(sysItems, t, { counts: counts.value }),
+      ...buildFolderRows(items, t, { counts: counts.value, sortable: true }),
       { divider: true },
-      ...userRows,
-      ...(userRows.length ? [{ divider: true }] : []),
       { label: '＋ ' + t('folder.new'), value: '__new' },
+      { label: '⚙ ' + t('folder.manage'), value: '__manage' },
     ],
     {
       tall: true,
-      onReorder: (ids) => reorderFolders(ids), // 按住 ≡ 拖曳排序，放開才寫入
+      // 按住 ≡ 拖曳排序，放開才寫入；資料夾列的 value 是數字 id，分隔線是 's:ID'
+      onReorder: (values) => reorderFolderItems(values.map((v) => (typeof v === 'number' ? 'f:' + v : v))),
       multi: {
         selected: folderFilter.value.slice(),
         toggle: async (key) => {
@@ -361,9 +358,17 @@ async function openPicker() {
     },
   )
   if (action === '__new') return newFolder()
+  if (action === '__manage') {
+    await openFolderManager()
+    await reload().catch((e) => toast(errText(e)))
+    return openPicker()
+  }
   if (action && typeof action === 'object' && 'more' in action) {
-    const f = folders.value.find((x) => x.id === action.more && !isSystemKind(x.kind))
-    if (f && (await folderMenu(f))) openPicker() // 管理完回到選單，方便連續操作
+    const key = typeof action.more === 'number' ? 'f:' + action.more : action.more
+    if (await openFolderItemMenu(findItem(items, key))) {
+      await reload().catch((e) => toast(errText(e))) // 先更新清單與本數，再重開選單，方便連續操作
+      openPicker()
+    }
   }
 }
 
@@ -377,41 +382,8 @@ async function changeSort(mode) {
 }
 
 async function newFolder() {
-  let newId = null
-  const name = await promptDialog(t('folder.new'), {
-    placeholder: t('folder.namePlaceholder'),
-    validate: async (v) => {
-      newId = await createFolder(v)
-    },
-  })
-  if (name != null && newId) select(newId)
-}
-
-async function folderMenu(f) {
-  const action = await actionSheet(f.name, [
-    { label: t('folder.rename'), value: 'rename' },
-    { label: t('folder.delete'), value: 'delete', danger: true },
-  ])
-  if (!action) return false
-  try {
-    if (action === 'rename') {
-      await promptDialog(t('folder.rename'), {
-        value: f.name,
-        placeholder: t('folder.namePlaceholder'),
-        validate: (v) => renameFolder(f.id, v),
-      })
-    } else if (action === 'delete') {
-      const ok = await confirmDialog(t('folder.deleteConfirm', { name: f.name }), {
-        okText: t('common.delete'),
-        danger: true,
-      })
-      if (ok) await deleteFolder(f.id)
-    }
-    await reload() // 先更新清單與本數，再讓呼叫端重開選單
-  } catch (err) {
-    toast(errText(err))
-  }
-  return true
+  const newId = await newFolderPrompt()
+  if (newId) select(newId)
 }
 
 // ---- 單本（選單與開網頁與新增頁共用 bookActions.js） ----

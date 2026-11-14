@@ -11,12 +11,13 @@ import {
   normalizeFolderName,
   normalizeNote,
   normalizeRecentLimit,
+  normalizeSeparatorName,
   parseGallery,
   parseSearchFieldsRaw,
   FILTER_TAG_TYPES,
 } from './parse.js'
 import { buildFilterWhere, UNCAT_SQL } from './filter.js'
-import { mergeFolderItems, isSystemKind } from './folderOrder.js'
+import { mergeFolderItems, isSystemKind, planReorder, parseItemKey } from './folderOrder.js'
 import { planAdd } from './addPlan.js'
 import { buildCsv, validateCsv, CSV_MAX_BYTES } from './csv.js'
 import { loadSettings, migrateSettings, setSetting, settings } from './settings.js'
@@ -317,17 +318,24 @@ function checkId(id) {
  * - already：已在所選資料夾 → 不做事
  * - addFolders：已收藏 → 只補資料夾關聯，不重抓資料與封面
  * - new：寫入一筆「待補資料」（meta_pending），交給背景佇列；書是否存在於網站由佇列判斷
+ * 「未讀」只對新書生效：已收藏的書即使選了未讀也不會被放回去。
  * @returns {Promise<{kind:'new'|'already'|'addFolders', id:number, originalFolders?:{kind:string, name:string}[]}>}
+ *   originalFolders：already／addFolders 時為這本書原本所在的資料夾
  */
 export async function quickAdd(id, folderIds = []) {
   id = checkId(id)
   const existing = await getBook(id)
   const existingFolders = existing ? await getBookFolders(id) : []
-  const plan = planAdd(existing ? { folderIds: existingFolders.map((f) => f.id) } : null, folderIds)
-  if (plan.kind === 'already') return { kind: 'already', id }
+  const originalFolders = existingFolders.map((f) => ({ kind: f.kind, name: f.name }))
+  // 「未讀」只對新書生效：已收藏（可能已讀過、被移出未讀）的書不會被放回未讀
+  const { unread } = await getSystemFolderIds()
+  const plan = planAdd(existing ? { folderIds: existingFolders.map((f) => f.id) } : null, folderIds, {
+    newOnly: unread ? [unread] : [],
+  })
+  if (plan.kind === 'already') return { kind: 'already', id, originalFolders }
   if (plan.kind === 'addFolders') {
     await addBooksToFolders([id], plan.toAdd)
-    return { kind: 'addFolders', id, originalFolders: existingFolders.map((f) => ({ kind: f.kind, name: f.name })) }
+    return { kind: 'addFolders', id, originalFolders }
   }
   try {
     await transaction([
@@ -638,33 +646,60 @@ export async function deleteFolder(id) {
 }
 
 /**
- * 依拖曳結果重排使用者資料夾：ids 為新的順序。一個交易更新所有 sort_order，失敗整批回滾。
- * 清單中沒列到的資料夾（例如拖曳時別處新增的）接在後面，維持原本相對順序；系統資料夾忽略。
- * （階段 B 會以 reorderFolderItems 取代，屆時刪除）
+ * 依拖曳結果重排「使用者資料夾＋分隔線」：keys 為新順序的項目鍵（'f:ID'／'s:ID'）。
+ * 一個交易依序把 sort_order 設成 1、2、3…，失敗整批回滾。
+ * 沒列到的項目（例如拖曳時別處新增的）接在後面，維持原本相對順序；系統資料夾與未知的鍵忽略。
  */
-export async function reorderFolders(ids) {
-  const list = (await listFolders()).filter((f) => !isSystemKind(f.kind))
-  const known = new Set(list.map((f) => f.id))
-  const seen = new Set()
-  const order = []
-  for (const raw of ids) {
-    const id = Number(raw)
-    if (Number.isInteger(id) && known.has(id) && !seen.has(id)) {
-      seen.add(id)
-      order.push(id)
-    }
-  }
-  for (const f of list) if (!seen.has(f.id)) order.push(f.id)
+export async function reorderFolderItems(keys) {
   try {
-    await transaction(
-      order.map((id, idx) => ({
-        statement: "UPDATE folders SET sort_order = ? WHERE id = ? AND kind = 'user'",
-        values: [idx + 1, id],
-      })),
-    )
+    const current = (await listFolderItems()).filter((x) => !isSystemKind(x.kind)).map((x) => x.key)
+    const order = planReorder(current, keys)
+    const stmts = []
+    order.forEach((key, idx) => {
+      const k = parseItemKey(key)
+      if (!k) return
+      stmts.push(
+        k.type === 'folder'
+          ? { statement: "UPDATE folders SET sort_order = ? WHERE id = ? AND kind = 'user'", values: [idx + 1, k.id] }
+          : { statement: 'UPDATE folder_separators SET sort_order = ? WHERE id = ?', values: [idx + 1, k.id] },
+      )
+    })
+    if (stmts.length) await transaction(stmts)
   } finally {
     bump() // 失敗時也通知，讓畫面重新讀回資料庫裡的順序
   }
+}
+
+// ---- 分隔線：只是視覺工具，不能放書；名稱可留空、可重複，最多 30 字 ----
+function validateSeparatorName(name) {
+  const n = normalizeSeparatorName(name)
+  if (n == null) throw new AppError(E.SEPARATOR_NAME_INVALID)
+  return n
+}
+
+/** 新增分隔線（接在最後）；回傳 id */
+export async function createSeparator(name) {
+  const n = validateSeparatorName(name)
+  const max = await maxUserSortOrder()
+  const res = await run('INSERT INTO folder_separators(name, sort_order, created_at) VALUES (?,?,?)', [
+    n,
+    max + 1,
+    Math.floor(Date.now() / 1000),
+  ])
+  bump()
+  return res.lastId
+}
+
+export async function renameSeparator(id, name) {
+  const n = validateSeparatorName(name)
+  await run('UPDATE folder_separators SET name = ? WHERE id = ?', [n, Number(id)])
+  bump()
+}
+
+/** 刪除分隔線（不影響任何書） */
+export async function deleteSeparator(id) {
+  await run('DELETE FROM folder_separators WHERE id = ?', [Number(id)])
+  bump()
 }
 
 export async function getSortMode(folderKey) {
