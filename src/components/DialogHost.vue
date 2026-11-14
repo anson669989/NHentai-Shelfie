@@ -142,7 +142,7 @@
     </div>
 
     <transition name="fade">
-      <div v-if="ui.toast" :key="ui.toast.id" class="toast">{{ ui.toast.text }}</div>
+      <div v-if="ui.toast" :key="ui.toast.id" class="toast" :class="{ top: ui.toast.top }">{{ ui.toast.text }}</div>
     </transition>
   </div>
 </template>

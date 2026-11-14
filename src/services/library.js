@@ -442,15 +442,6 @@ export async function addBooksToFolders(ids, folderIds) {
   bump()
 }
 
-/** 單本的資料夾關聯：勾選結果直接套用（⋮ → 分類） */
-export async function setBookFolders(id, folderIds) {
-  await transaction([
-    { statement: 'DELETE FROM book_folders WHERE gallery_id = ?', values: [Number(id)] },
-    ...folderStatements([id], folderIds),
-  ])
-  bump()
-}
-
 export async function removeBooksFromFolder(ids, folderId) {
   if (!ids.length) return
   await transaction(
@@ -530,17 +521,14 @@ export async function changeBookId(oldId, newId) {
 }
 
 /**
- * ⋮「重抓封面」：重新排進背景佇列（不等網路）。已有 api-v2 原始資料就只抓封面，否則先補資料。
- * 舊封面保留到新封面下載成功為止。
+ * ⋮ 右上角「重新載入」：重新向網站查詢這本（更新書名、原始資料、標籤），再重新下載封面。
+ * 只把狀態改回 meta_pending 排進背景佇列（不等網路）；舊封面保留到新封面下載成功為止（replaceCover）。
  */
-export async function requeueBook(id) {
-  await run(
-    `UPDATE books SET queue_seq = ?, fetch_status = CASE
-        WHEN EXISTS (SELECT 1 FROM book_raw r WHERE r.gallery_id = books.gallery_id AND r.raw_format = ?) THEN 'cover_pending'
-        ELSE 'meta_pending' END
-      WHERE gallery_id = ?`,
-    [nextSeq(), RAW_FORMAT, Number(id)],
-  )
+export async function refreshBook(id) {
+  await run("UPDATE books SET fetch_status = 'meta_pending', queue_seq = ? WHERE gallery_id = ?", [
+    nextSeq(),
+    Number(id),
+  ])
   bump()
   await refreshPendingCount()
   runQueue()
@@ -915,7 +903,7 @@ async function coverLoop() {
         retryLater('cover', NET_RETRY_MS)
         return
       }
-      await setStatus(id, 'no_cover') // 封面失敗；⋮「重抓封面」可重試
+      await setStatus(id, 'no_cover') // 封面失敗；⋮ 選單右上角「重新載入」可重試
     }
     bump()
     await refreshPendingCount()

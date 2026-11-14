@@ -89,8 +89,15 @@ export const checklistDialog = (title, items, selected = [], { extraAction } = {
   open('checklist', { title, items, selected: [...selected], extraAction })
 
 let toastTimer = null
-export function toast(text, ms = 2200) {
-  ui.toast = { text, id: ++seq }
+/**
+ * 提示訊息（幾秒後自動消失）
+ * @param {string} text
+ * @param {number|{ms?:number, top?:boolean}} [opts] 數字＝顯示毫秒；top：顯示在畫面上半部、加寬（新增頁的重複收藏提示，
+ *   使用者輸入 ID 後視線在上方）
+ */
+export function toast(text, opts = {}) {
+  const { ms = 2200, top = false } = typeof opts === 'number' ? { ms: opts } : opts
+  ui.toast = { text, id: ++seq, top }
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (ui.toast = null), ms)
 }

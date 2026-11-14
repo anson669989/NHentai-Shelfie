@@ -294,6 +294,12 @@ details.row[open] { gap: 8px; }
   background: rgba(30, 30, 34, .92); color: #fff; padding: 10px 16px; border-radius: 10px;
   font-size: 14px; max-width: 86vw; text-align: center; white-space: pre-wrap;
 }
+/* 上半部的加寬提示（新增頁的重複收藏）：放在 ID 輸入與資料夾列下方，寬一點、行距鬆一點 */
+.toast.top {
+  bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 140px);
+  width: min(92vw, 520px); max-width: none; padding: 14px 18px; line-height: 1.6; font-size: 15px;
+  border-radius: 12px; box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
+}
 .fade-enter-active, .fade-leave-active { transition: opacity .2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
@@ -312,6 +318,10 @@ details.row[open] { gap: 8px; }
 .recent-name { font-size: 14px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .add-page .folder-pick-row .select-like { flex: 1; min-width: 0; justify-content: flex-start; gap: 2px; }
 .add-page .folder-pick-row .caret { margin-left: auto; }
+/* 資料夾回到預設的灰色重新載入鈕 */
+.reset-btn { color: var(--muted); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.reset-btn:active { background: var(--surface-2); }
+.reset-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* 最近加入：整條可點（開網頁）、長按開「⋮」選單；不可觸發文字選取 */
 .recent-row { cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }

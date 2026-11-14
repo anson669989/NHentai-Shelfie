@@ -6,10 +6,10 @@ import {
   getBook,
   getBookFolders,
   getBookTitles,
-  setBookFolders,
+  addBooksToFolders,
   removeBooksFromFolder,
   deleteBooks,
-  requeueBook,
+  refreshBook,
   changeBookId,
   openUrlFor,
   openBookPage,
@@ -50,30 +50,83 @@ export async function copyId(id) {
   }
 }
 
+/** 「新增資料夾」輸入框；建立成功回傳 { id, name }，取消回傳 null */
+export async function promptNewFolder() {
+  let id = null
+  const name = await promptDialog(t('folder.new'), {
+    placeholder: t('folder.namePlaceholder'),
+    validate: async (v) => {
+      id = await createFolder(v)
+    },
+  })
+  return name != null && id ? { id, name: name.trim() } : null
+}
+
 /**
- * 勾選資料夾（可在清單內「＋ 新增資料夾」）；items 用 buildFolderRows 產生（含分隔線）。
- * 回傳的陣列只含資料夾 id（數字）。
+ * 勾選資料夾（確定／取消；可在清單內「＋ 新增資料夾」）；items 用 buildFolderRows 產生（含分隔線）。
+ * 只剩多選模式的「批次分類」在用（一次性動作，維持確定／取消）。回傳的陣列只含資料夾 id（數字）。
  */
 export async function pickFoldersDialog(title, items, preselected = []) {
   return checklistDialog(title, items, preselected, {
     extraAction: {
       label: '＋ ' + t('folder.new'),
       run: async () => {
-        let id = null
-        const name = await promptDialog(t('folder.new'), {
-          placeholder: t('folder.namePlaceholder'),
-          validate: async (v) => {
-            id = await createFolder(v)
-          },
-        })
-        return name != null && id ? { label: name.trim(), value: id } : null
+        const added = await promptNewFolder()
+        return added ? { label: added.name, value: added.id } : null
       },
     },
   }).then((picked) => picked && picked.filter((v) => typeof v === 'number'))
 }
 
 /**
- * 「⋮」單本選單：完整標題、備註（單行，離開輸入框自動儲存）與單本功能。
+ * 「改了就存」的資料夾多選選單（單本分類、新增頁選資料夾共用）：
+ * 列含未讀、典藏與分隔線（buildFolderRows），點一列立刻呼叫 toggle、選單不關；
+ * 最下方「＋ 新增資料夾」建立後呼叫 onCreated，再重開選單。點空白處、返回鍵或「完成」關閉。
+ * @param {string} title
+ * @param {{getSelected:()=>Promise<number[]>|number[], toggle:(id:number)=>Promise<number[]>|number[], onCreated:(id:number)=>any}} opts
+ */
+export async function liveFolderSheet(title, { getSelected, toggle, onCreated }) {
+  for (;;) {
+    let items
+    let selected
+    try {
+      items = await listFolderItems()
+      selected = await getSelected()
+    } catch (err) {
+      toast(errText(err))
+      return
+    }
+    const r = await actionSheet(
+      title,
+      [...buildFolderRows(items, t), { divider: true }, { label: '＋ ' + t('folder.new'), value: '__new' }],
+      { tall: true, multi: { selected, toggle } },
+    )
+    if (r !== '__new') return
+    try {
+      const added = await promptNewFolder()
+      if (added) await onCreated(added.id) // 建立後自動勾選
+    } catch (err) {
+      toast(errText(err))
+    }
+  }
+}
+
+/** ⋮ →「分類」：勾選或取消立刻寫入資料庫（以資料庫為準回傳勾選結果；失敗時錯誤往外丟、勾選不變） */
+export async function openClassifySheet(bookId) {
+  const current = async () => (await getBookFolders(bookId)).map((f) => f.id)
+  await liveFolderSheet(t('book.classify'), {
+    getSelected: current,
+    toggle: async (folderId) => {
+      if ((await current()).includes(folderId)) await removeBooksFromFolder([bookId], folderId)
+      else await addBooksToFolders([bookId], [folderId])
+      return current()
+    },
+    onCreated: (folderId) => addBooksToFolders([bookId], [folderId]),
+  })
+}
+
+/**
+ * 「⋮」單本選單：完整標題、備註（單行，離開輸入框自動儲存）與單本功能；右上角灰色圖示＝重新載入。
  * @param {{gallery_id:number, title?:string, fetch_status?:string}} book
  * @param {{currentFolder?: {id:number, name:string, kind?:string}|null}} [opts] 目前所在的資料夾（含未讀、典藏；顯示「從此資料夾移除」）
  */
@@ -114,30 +167,24 @@ export async function openBookMenu(book, { currentFolder = null } = {}) {
     `#${id}`,
     [
       { label: t('book.copyId'), value: 'copy' },
-      ...(notFound ? [{ label: t('book.changeId'), value: 'changeId' }] : [{ label: t('book.open'), value: 'open' }]),
-      { label: t('book.classify'), value: 'folders' },
+      ...(notFound ? [{ label: t('book.changeId'), value: 'changeId' }] : []),
+      { label: '📁 ' + t('book.classify'), value: 'folders' },
       ...(f ? [{ label: t('book.removeFromFolder', { name: folderLabel(f, t) }), value: 'remove' }] : []),
-      ...(notFound ? [] : [{ label: t('book.refetch'), value: 'refetch' }]),
       { label: t('book.delete'), value: 'delete', danger: true },
     ],
-    { lines, note },
+    { lines, note, headAction: { icon: 'refresh', label: t('book.refresh'), value: 'refresh' } },
   )
   await saveNote(note.value) // 返回鍵或點背景關閉時，輸入框可能沒有觸發 blur
 
   try {
     if (action === 'copy') await copyId(id)
-    else if (action === 'open') await openBook(book)
     else if (action === 'changeId') await changeId(book)
-    else if (action === 'folders') {
-      const before = (await getBookFolders(id)).map((x) => x.id)
-      const items = await listFolderItems()
-      const picked = await pickFoldersDialog(t('book.classify'), buildFolderRows(items, t), before)
-      if (picked) await setBookFolders(id, picked)
-    } else if (action === 'remove') {
+    else if (action === 'folders') await openClassifySheet(id)
+    else if (action === 'remove') {
       await removeBooksFromFolder([id], f.id)
       toast(t('select.removed', { n: 1 }))
-    } else if (action === 'refetch') {
-      await requeueBook(id)
+    } else if (action === 'refresh') {
+      await refreshBook(id)
       toast(t('book.requeued'))
     } else if (action === 'delete') {
       const ok = await confirmDialog(t('book.deleteConfirm', { id }), { okText: t('common.delete'), danger: true })
@@ -160,4 +207,3 @@ async function changeId(book) {
     },
   })
 }
-

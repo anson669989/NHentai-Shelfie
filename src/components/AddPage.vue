@@ -28,7 +28,13 @@
               <span class="folder-select-name">{{ selectedNames || t('add.noFolder') }}</span>
               <span class="caret">▾</span>
             </button>
-            <button class="btn icon" :aria-label="t('folder.new')" @click="quickNewFolder">＋</button>
+            <!-- 回到預設（未分類＋未讀） -->
+            <button class="btn icon reset-btn" :aria-label="t('add.resetFolders')" :title="t('add.resetFolders')" @click="resetFolders">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+                <path d="M20 4v5h-5" />
+              </svg>
+            </button>
           </div>
         </div>
         <!-- 已收藏提示（只查本機） -->
@@ -89,9 +95,7 @@ import {
   getBookFolders,
   quickAdd,
   listFolders,
-  listFolderItems,
   listRecentBooks,
-  createFolder,
   coverSrc,
   dataVersion,
   sharedInput,
@@ -99,11 +103,11 @@ import {
 import { parseGalleryId } from '../services/parse.js'
 import { settings, setSetting } from '../services/settings.js'
 import { t, errText } from '../i18n.js'
-import { checklistDialog, promptDialog, toast } from '../ui.js'
+import { toast } from '../ui.js'
 import { statusKey, isLoadingStatus } from './bookStatus.js'
-import { openBook, openBookMenu } from './bookActions.js'
+import { openBook, openBookMenu, liveFolderSheet } from './bookActions.js'
 import { viewOptions } from './viewOptions.js'
-import { bookFolderLabels, buildFolderRows } from './folderRows.js'
+import { bookFolderLabels } from './folderRows.js'
 
 const props = defineProps({ active: Boolean })
 
@@ -191,49 +195,35 @@ function onPaste() {
   }, 0)
 }
 
+/** 套用新的資料夾選擇：立刻記住（重開 App 仍在）並重新檢查已收藏提示 */
+async function applySelected(ids) {
+  selected.value = ids
+  await setSetting('last_folders', JSON.stringify(ids))
+  checkDuplicate()
+  return ids
+}
+
+/** 選資料夾：改了就存（含未讀、典藏與分隔線，順序和管理資料夾一致） */
 async function pickFolders() {
-  let items = []
+  await liveFolderSheet(t('add.folders'), {
+    getSelected: () => selected.value,
+    toggle: (id) =>
+      applySelected(selected.value.includes(id) ? selected.value.filter((v) => v !== id) : [...selected.value, id]),
+    onCreated: async (id) => {
+      folders.value = await listFolders()
+      if (!selected.value.includes(id)) await applySelected([...selected.value, id]) // 建立後自動勾選
+    },
+  })
+}
+
+/** 灰色重新載入鈕：資料夾回到預設＝只有「未讀」（沒有自建資料夾所以也是「未分類」） */
+async function resetFolders() {
   try {
-    items = await listFolderItems()
+    if (!folders.value.length) folders.value = await listFolders()
+    const unread = folders.value.find((f) => f.kind === 'unread')
+    await applySelected(unread ? [unread.id] : [])
   } catch (err) {
     toast(errText(err))
-    return
-  }
-  // 含未讀、典藏與分隔線，順序和管理資料夾一致；只回傳資料夾 id
-  const picked = await checklistDialog(t('add.folders'), buildFolderRows(items, t), selected.value, {
-    extraAction: {
-      label: '＋ ' + t('folder.new'),
-      run: async () => {
-        const added = await promptNewFolder()
-        return added ? { label: added.name, value: added.id } : null
-      },
-    },
-  })
-  if (picked) {
-    selected.value = picked.filter((v) => typeof v === 'number')
-    await setSetting('last_folders', JSON.stringify(selected.value))
-    checkDuplicate()
-  }
-}
-
-async function promptNewFolder() {
-  let id = null
-  const name = await promptDialog(t('folder.new'), {
-    placeholder: t('folder.namePlaceholder'),
-    validate: async (v) => {
-      id = await createFolder(v)
-    },
-  })
-  if (name == null || !id) return null
-  folders.value = await listFolders()
-  return { id, name: folders.value.find((f) => f.id === id)?.name || name }
-}
-
-async function quickNewFolder() {
-  const added = await promptNewFolder()
-  if (added && !selected.value.includes(added.id)) {
-    selected.value = [...selected.value, added.id] // 建立後自動勾選
-    await setSetting('last_folders', JSON.stringify(selected.value))
   }
 }
 
@@ -246,8 +236,10 @@ async function submit() {
   try {
     const r = await quickAdd(id, selected.value)
     if (r.kind === 'new') toast(t('add.added', { id }))
-    else if (r.kind === 'already') toast(t('add.alreadyHere', { id, names: folderNames(r.originalFolders) }))
-    else toast(t('add.addedExisting', { id, names: folderNames(r.originalFolders) }))
+    // 重複收藏的提示比較長：放在畫面上半部、加寬、多留一點時間
+    else if (r.kind === 'already')
+      toast(t('add.alreadyHere', { id, names: folderNames(r.originalFolders) }), { top: true, ms: 3500 })
+    else toast(t('add.addedExisting', { id, names: folderNames(r.originalFolders) }), { top: true, ms: 3500 })
     raw.value = ''
     dup.value = null
     await setSetting('last_folders', JSON.stringify(selected.value))
