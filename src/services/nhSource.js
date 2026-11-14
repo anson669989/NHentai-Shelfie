@@ -703,6 +703,61 @@ export async function onShareReceived(cb) {
   }
 }
 
+// ---------- 快速分享（直接收藏）：原生收件匣 ----------
+// 原生端（ShareReceiverActivity）不碰 SQLite，分享進來的 ID 只記在收件匣；這裡是 JS 端唯一的出入口。
+// 外掛不存在或失敗時安靜回傳空值，不丟錯。
+
+/**
+ * 把設定與「已收藏 ID 快照」推給原生端。
+ * @param {{mode:string, hosts:string[], ids:number[], msgSaved:string, msgDuplicate:string, msgNotNh:string, msgFailed:string}} cfg
+ *   提示文字含 {id} 佔位符（原樣傳下去，由原生代換）
+ */
+export async function setQuickShareConfig(cfg) {
+  try {
+    await NhWebFetch.setQuickShareConfig({
+      mode: cfg.mode === 'quick' ? 'quick' : 'open',
+      hosts: (cfg.hosts || []).join(','),
+      ids: (cfg.ids || []).join(','),
+      msgSaved: cfg.msgSaved || '',
+      msgDuplicate: cfg.msgDuplicate || '',
+      msgNotNh: cfg.msgNotNh || '',
+      msgFailed: cfg.msgFailed || '',
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** 讀出收件匣（不清除）：[{ id, at }] */
+export async function peekQuickShares() {
+  try {
+    const r = await NhWebFetch.peekQuickShares()
+    return Array.isArray(r?.items) ? r.items.map((x) => ({ id: Number(x?.id), at: Number(x?.at) })) : []
+  } catch {
+    return []
+  }
+}
+
+/** 把已處理的 ID 從收件匣移除 */
+export async function ackQuickShares(ids) {
+  try {
+    await NhWebFetch.ackQuickShares({ ids })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** App 還活著時，原生端收到「直接收藏」會發出事件；callback 內再呼叫 peekQuickShares() */
+export async function onQuickShareReceived(cb) {
+  try {
+    return await NhWebFetch.addListener('quickShareReceived', () => cb())
+  } catch {
+    return null
+  }
+}
+
 // ---------- 開啟網頁（設定「開啟網頁方式」） ----------
 /**
  * 以外部瀏覽器（預設）或 App 內瀏覽器（Custom Tab）開啟網址。

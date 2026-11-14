@@ -34,6 +34,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -43,9 +44,12 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.lang.ref.WeakReference;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -59,9 +63,12 @@ import java.util.regex.Pattern;
  *
  * 所有 WebView 操作都在主執行緒進行（plugin 方法本身在背景執行緒被呼叫）。
  *
- * 另外負責接收瀏覽器「分享」進來的文字（ACTION_SEND text/plain；intent-filter 由 scripts/patch-android.mjs 加到
- * MainActivity）：冷啟動時在 load() 讀 Activity 的 Intent，App 已在背景時由 handleOnNewIntent 接收並發出
- * shareReceived 事件；JS 端以 takeSharedText() 取出（取出即清除，不會重複處理）。
+ * 另外負責接收瀏覽器「分享」進來的文字（ACTION_SEND text/plain）。分享入口是 ShareReceiverActivity（本外掛的
+ * manifest 宣告，分享選單裡唯一的 NH Shelfie），依設定二選一：
+ * - 「開 App 選資料夾」：轉給 MainActivity；冷啟動時在 load() 讀 Activity 的 Intent，App 已在背景時由
+ *   handleOnNewIntent 接收並發出 shareReceived 事件；JS 端以 takeSharedText() 取出（取出即清除，不會重複處理）。
+ * - 「直接收藏」：ID 記進 QuickShareStore 的收件匣（原生端不碰 SQLite），發出 quickShareReceived 事件；
+ *   JS 以 setQuickShareConfig / peekQuickShares / ackQuickShares 同步設定與處理收件匣。
  */
 @CapacitorPlugin(name = "NhWebFetch")
 public class NhWebFetchPlugin extends Plugin {
@@ -119,9 +126,24 @@ public class NhWebFetchPlugin extends Plugin {
     private static final int MAX_SHARE_CHARS = 4096;
     private String pendingShare;
 
+    // 快速分享（ShareReceiverActivity）要通知還活著的外掛實例：用弱參考，不擋垃圾回收
+    private static WeakReference<NhWebFetchPlugin> instance;
+
+    /** 有存活的外掛實例時，發出 quickShareReceived 事件（JS 收到後處理收件匣）；沒有就什麼都不做。 */
+    static void notifyQuickShare() {
+        NhWebFetchPlugin p;
+        synchronized (NhWebFetchPlugin.class) {
+            p = instance == null ? null : instance.get();
+        }
+        if (p != null) p.notifyListeners("quickShareReceived", new JSObject(), true);
+    }
+
     @Override
     public void load() {
         super.load();
+        synchronized (NhWebFetchPlugin.class) {
+            instance = new WeakReference<>(this);
+        }
         Activity activity = getActivity();
         if (activity != null) captureShare(activity.getIntent(), false);
     }
@@ -165,6 +187,46 @@ public class NhWebFetchPlugin extends Plugin {
         JSObject ret = new JSObject();
         ret.put("text", value == null ? "" : value);
         call.resolve(ret);
+    }
+
+    // ------------------------------------------------------------------ 快速分享（直接收藏）
+
+    /** JS 推送設定：模式、允許的網域、已收藏 ID 快照、四句提示文字（含 {id}，目前介面語言）。 */
+    @PluginMethod
+    public void setQuickShareConfig(PluginCall call) {
+        QuickShareStore.setConfig(
+            getContext(),
+            call.getString("mode", QuickShareStore.MODE_OPEN),
+            call.getString("hosts"),
+            call.getString("ids"),
+            call.getString("msgSaved"),
+            call.getString("msgDuplicate"),
+            call.getString("msgNotNh"),
+            call.getString("msgFailed")
+        );
+        call.resolve();
+    }
+
+    /** 讀出收件匣 { items: [{ id, at }] }，不清除。 */
+    @PluginMethod
+    public void peekQuickShares(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("items", QuickShareStore.peek(getContext()));
+        call.resolve(ret);
+    }
+
+    /** 把已處理的 ID 從收件匣移除：{ ids: [...] }。 */
+    @PluginMethod
+    public void ackQuickShares(PluginCall call) {
+        Set<Integer> ids = new HashSet<>();
+        JSArray arr = call.getArray("ids");
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                ids.add(arr.optInt(i, -1));
+            }
+        }
+        QuickShareStore.ack(getContext(), ids);
+        call.resolve();
     }
 
     // ------------------------------------------------------------------ API
@@ -265,6 +327,9 @@ public class NhWebFetchPlugin extends Plugin {
 
     @Override
     protected void handleOnDestroy() {
+        synchronized (NhWebFetchPlugin.class) {
+            if (instance != null && instance.get() == this) instance = null;
+        }
         main.post(this::releaseWebView);
         super.handleOnDestroy();
     }

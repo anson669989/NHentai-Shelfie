@@ -5,7 +5,8 @@
 // 2. network security config：全域禁止明文傳輸
 // 3. app/build.gradle：由環境變數注入 versionCode / versionName 與 release 簽章
 // 4. App 圖示：以 scripts/gen-icons.mjs 產生（取代 Capacitor 預設圖示）
-// 5. 從瀏覽器「分享」加入：MainActivity 接收 ACTION_SEND text/plain（由 nh-webfetch 外掛讀取）
+// 5. 從瀏覽器「分享」加入：入口是 nh-webfetch 外掛的 ShareReceiverActivity（不在這裡加 intent-filter；
+//    移除舊版加在 MainActivity 的那一段）。另外加 windowSoftInputMode=adjustResize（鍵盤出現時視窗縮小）
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { generateIcons } from './gen-icons.mjs'
@@ -34,30 +35,24 @@ if (!manifest.includes('android:networkSecurityConfig')) {
 if (!manifest.includes('android:fullBackupContent')) {
   manifest = manifest.replace('<application', '<application\n        android:fullBackupContent="false"')
 }
-// ---------- 5. 分享 intent-filter（加到 MainActivity；launchMode singleTask 讓背景時走 onNewIntent）----------
-const SHARE_FILTER = `
-            <!-- nh-shelfie share: 從瀏覽器「分享」網址加入 -->
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-`
+
+// ---------- 5. 分享 ----------
+// 分享入口是 nh-webfetch 外掛 manifest 裡的 ShareReceiverActivity（分享選單只出現一個 NH Shelfie），
+// 所以 MainActivity 不能再有 ACTION_SEND 的 intent-filter。舊版腳本加過的那一段（以註解 `<!-- nh-shelfie share:` 開頭、
+// 到緊接著的 `</intent-filter>` 為止）在這裡移除；可重複執行。
+const OLD_SHARE_FILTER_RE = /[ \t]*<!-- nh-shelfie share:[^>]*-->\s*<intent-filter>[\s\S]*?<\/intent-filter>[ \t]*\r?\n?/g
+manifest = manifest.replace(OLD_SHARE_FILTER_RE, '')
+// 保留 singleTask：分享轉進來時 App 若在背景，走 onNewIntent
 const MAIN_ACTIVITY_RE = /<activity\b[^>]*android:name="(?:\.|[\w.]+\.)MainActivity"/
-if (!manifest.includes('android.intent.action.SEND')) {
-  const actStart = manifest.search(MAIN_ACTIVITY_RE)
-  if (actStart < 0) {
-    console.error('找不到 MainActivity，無法加入分享 intent-filter')
-    process.exit(1)
-  }
-  const actEnd = manifest.indexOf('</activity>', actStart)
-  manifest = manifest.slice(0, actEnd).trimEnd() + SHARE_FILTER + '        ' + manifest.slice(actEnd)
-}
 if (!/android:launchMode="singleTask"/.test(manifest)) {
   manifest = manifest.replace(MAIN_ACTIVITY_RE, (m) => `${m}\n            android:launchMode="singleTask"`)
 }
+// 軟鍵盤出現時讓視窗縮小，對話框才能浮在鍵盤上方（見 src/viewport.js）
+if (!/android:windowSoftInputMode=/.test(manifest)) {
+  manifest = manifest.replace(MAIN_ACTIVITY_RE, (m) => `${m}\n            android:windowSoftInputMode="adjustResize"`)
+}
 writeFileSync(manifestPath, manifest)
-console.log('✔ AndroidManifest.xml 已更新（含分享 intent-filter）')
+console.log('✔ AndroidManifest.xml 已更新（分享入口改由外掛的 ShareReceiverActivity 負責；鍵盤 adjustResize）')
 
 const xmlDir = join(appDir, 'src', 'main', 'res', 'xml')
 mkdirSync(xmlDir, { recursive: true })

@@ -19,6 +19,7 @@ import {
 import { buildFilterWhere, UNCAT_SQL } from './filter.js'
 import { mergeFolderItems, isSystemKind, planReorder, parseItemKey } from './folderOrder.js'
 import { planAdd } from './addPlan.js'
+import { planQuickShareDrain, resolveAutoFolders, shareHosts } from './quickShare.js'
 import { buildCsv, validateCsv, CSV_MAX_BYTES } from './csv.js'
 import { loadSettings, migrateSettings, setSetting, settings } from './settings.js'
 import {
@@ -35,6 +36,10 @@ import {
   takeSharedText,
   onShareReceived,
   openInBrowser,
+  setQuickShareConfig,
+  peekQuickShares,
+  ackQuickShares,
+  onQuickShareReceived,
 } from './nhSource.js'
 
 const COVERS_DIR = 'covers'
@@ -353,6 +358,7 @@ export async function quickAdd(id, folderIds = []) {
   bump()
   await refreshPendingCount()
   kick('meta')
+  pushQuickShareConfig()
   return { kind: 'new', id }
 }
 
@@ -470,6 +476,7 @@ export async function deleteBooks(ids) {
   for (const p of paths) await deleteCoverFile(p)
   bump()
   await refreshPendingCount()
+  pushQuickShareConfig()
 }
 
 /** ⋮ 選單標題：完整英文／日文標題（單本讀 book_raw，本機解析，不上網） */
@@ -518,6 +525,7 @@ export async function changeBookId(oldId, newId) {
   bump()
   await refreshPendingCount()
   kick('meta')
+  pushQuickShareConfig()
 }
 
 /**
@@ -949,6 +957,102 @@ export async function listenForShares() {
   handleSharedText(await takeSharedText())
 }
 
+// ================= 快速分享（直接收藏）=================
+// 瀏覽器分享 → 原生 ShareReceiverActivity 只把 ID 記進收件匣（不碰 SQLite）；
+// App 在前景時這裡 peek → 以「先存、後查」寫入資料庫 → 才 ack。中途當掉最多重做一次，重做是安全的（已收藏就跳過）。
+let shareLabels = null
+
+/** 由介面傳入四句提示文字（含 {id} 佔位符，原樣傳給原生；服務層不 import i18n） */
+export function setShareLabels(labels) {
+  shareLabels = labels
+  return pushQuickShareConfig()
+}
+
+/** 把模式、允許的網域、已收藏 ID 快照與提示文字推給原生端；失敗只記 log（原生用上一份設定） */
+export async function pushQuickShareConfig() {
+  try {
+    const rows = await query('SELECT gallery_id FROM books')
+    await setQuickShareConfig({
+      mode: settings.share_mode,
+      hosts: shareHosts(settings.endpoint_page),
+      ids: rows.map((r) => r.gallery_id),
+      msgSaved: shareLabels?.saved,
+      msgDuplicate: shareLabels?.duplicate,
+      msgNotNh: shareLabels?.notNh,
+      msgFailed: shareLabels?.failed,
+    })
+  } catch (e) {
+    console.warn('push quick share config failed', e)
+  }
+}
+
+export async function setShareMode(mode) {
+  await setSetting('share_mode', mode === 'quick' ? 'quick' : 'open')
+  await pushQuickShareConfig()
+}
+
+/** 設定「直接收藏時自動加入」：資料夾 id 陣列（可為空＝都不加） */
+export async function setShareAutoFolders(ids) {
+  await setSetting('share_auto_folders', JSON.stringify([...new Set(ids.map(Number).filter(Number.isInteger))]))
+}
+
+let draining = null
+/**
+ * 處理原生收件匣。資料夾以「處理當下」的設定為準；已收藏的書完全不動（只清掉收件匣）。
+ * @returns {Promise<number>} 新增的本數
+ */
+export function drainQuickShares() {
+  if (draining) return draining
+  draining = doDrain().finally(() => {
+    draining = null
+  })
+  return draining
+}
+
+async function doDrain() {
+  const items = await peekQuickShares()
+  if (!items.length) return 0
+  const have = (await query('SELECT gallery_id FROM books')).map((r) => r.gallery_id)
+  const { add, ack } = planQuickShareDrain(items, have)
+  if (add.length) {
+    const { unread } = await getSystemFolderIds()
+    const folderIds = resolveAutoFolders(settings.share_auto_folders, await listFolders(), unread)
+    const stmts = []
+    for (const it of add) {
+      stmts.push({
+        statement:
+          "INSERT OR IGNORE INTO books(gallery_id, title, title_ja, fetch_status, added_at, queue_seq) VALUES (?, '', '', 'meta_pending', ?, ?)",
+        values: [it.id, Math.floor(it.at / 1000), nextSeq()],
+      })
+      stmts.push(...folderStatements([it.id], folderIds))
+    }
+    try {
+      await transaction(stmts)
+    } catch (err) {
+      throw dbError(err) // 沒寫成功就不 ack，下次再試
+    }
+  }
+  await ackQuickShares(ack)
+  if (add.length) {
+    bump()
+    await refreshPendingCount()
+    kick('meta')
+    pushQuickShareConfig()
+  }
+  return add.length
+}
+
+/** App 還活著時，原生端收到直接收藏就通知這裡；callback 收到新增本數（大於 0 才有意義） */
+export async function listenForQuickShares(cb) {
+  await onQuickShareReceived(async () => {
+    try {
+      cb(await drainQuickShares())
+    } catch (e) {
+      console.warn('drain quick shares failed', e)
+    }
+  })
+}
+
 // ================= Cloudflare 驗證 =================
 /**
  * 顯示驗證畫面讓使用者手動通過 Cloudflare challenge。
@@ -1112,6 +1216,7 @@ export async function commitCsvImport(okRows) {
   await refreshPendingCount()
   bump()
   runQueue()
+  pushQuickShareConfig()
 }
 
 export { setSetting, settings }

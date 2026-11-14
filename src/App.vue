@@ -35,9 +35,18 @@ import FoldersPage from './components/FoldersPage.vue'
 import AddPage from './components/AddPage.vue'
 import SettingsPage from './components/SettingsPage.vue'
 import DialogHost from './components/DialogHost.vue'
-import { initLibrary, runQueue, stopQueue, listenForShares, sharedInput } from './services/library.js'
+import {
+  initLibrary,
+  runQueue,
+  stopQueue,
+  listenForShares,
+  listenForQuickShares,
+  drainQuickShares,
+  setShareLabels,
+  sharedInput,
+} from './services/library.js'
 import { settings } from './services/settings.js'
-import { t } from './i18n.js'
+import { t, currentLang } from './i18n.js'
 import { closeTopDialog, runBackHandler, toast } from './ui.js'
 
 const tab = ref('folders')
@@ -86,17 +95,49 @@ onMounted(async () => {
   // 背景佇列只在前景執行：切到背景就停，回到前景、網路恢復時自動續跑；App 重開後也會從資料庫接著做
   listeners.push(
     await CapApp.addListener('appStateChange', ({ isActive }) => {
-      if (isActive) runQueue().catch(() => {})
-      else stopQueue()
+      if (isActive) {
+        drainShares()
+        runQueue().catch(() => {})
+      } else stopQueue()
     }),
   )
   window.addEventListener('online', onOnline)
+  // 直接收藏：先同步提示文字與設定給原生，再處理收件匣（要在啟動佇列之前，新書才會排進去）
+  await pushShareLabels()
+  await drainShares()
+  listenForQuickShares(onDrained).catch((e) => console.warn('quick share listener', e))
   runQueue().catch(() => {})
   // 從瀏覽器「分享」進來：切到「新增」頁（AddPage 會填入 ID）
   listenForShares().catch((e) => console.warn('share listener', e))
 })
 
 const onOnline = () => runQueue().catch(() => {})
+
+// ---- 快速分享（直接收藏）----
+// {id} 佔位符原樣傳給原生端，由原生代換（t() 對沒給的變數會保留它）
+const pushShareLabels = () =>
+  setShareLabels({
+    saved: t('share.saved'),
+    duplicate: t('share.duplicate'),
+    notNh: t('share.notNh'),
+    failed: t('share.failed'),
+  })
+function onDrained(n) {
+  if (n > 0) {
+    toast(t('share.drained', { n }))
+    runQueue().catch(() => {})
+  }
+}
+async function drainShares() {
+  try {
+    onDrained(await drainQuickShares())
+  } catch (e) {
+    console.warn('drain quick shares failed', e)
+  }
+}
+watch(currentLang, () => {
+  if (ready.value) pushShareLabels()
+})
 watch(sharedInput, (v) => {
   if (v) tab.value = 'add'
 })

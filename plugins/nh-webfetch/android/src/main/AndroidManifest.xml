@@ -1,3 +1,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- 不宣告任何權限：只用 App 既有的 INTERNET -->
+    <application>
+        <!-- 瀏覽器「分享」的唯一入口：依設定轉給 MainActivity，或直接收藏（無畫面）。不設 label／icon，沿用 App 的 -->
+        <activity
+            android:name="io.github.anson669989.nhwebfetch.ShareReceiverActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+    </application>
 </manifest>

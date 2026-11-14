@@ -45,6 +45,27 @@ export function extractGalleryId(text) {
   return null
 }
 
+/**
+ * 「直接收藏」用：只認 nhentai 的網址（https?://[子網域.]網域/g/{1–7 位數字}），純數字與 #123456 不算。
+ * 回傳位置最前面的那個 ID；找不到回傳 null。只看前 4096 字。
+ * ⚠ 與 plugins/nh-webfetch/.../QuickShareStore.java 的 extractId 規則完全相同，改一邊要同步另一邊。
+ * @param {string} text
+ * @param {string[]} [hosts]
+ * @returns {number|null}
+ */
+export function extractNhGalleryId(text, hosts = ['nhentai.net']) {
+  if (text == null) return null
+  const names = (Array.isArray(hosts) ? hosts : [])
+    .map((h) => String(h).trim().toLowerCase())
+    .filter((h) => /^[a-z0-9.-]+$/.test(h))
+    .map((h) => h.replaceAll('.', '\\.')) // 已限制成 [a-z0-9.-]，只有 . 需要跳脫
+  if (!names.length) return null
+  const s = toHalfWidth(text).slice(0, 4096)
+  const re = new RegExp(`https?://(?:[a-z0-9-]+\\.)*(?:${names.join('|')})/g/(\\d{1,7})(?=[/?#\\s]|$)`, 'i')
+  const m = re.exec(s)
+  return m ? toId(m[1]) : null
+}
+
 /** 只以整數 / 純數字字串套範本組網址，避免拼出意外網址。 */
 export function fillTemplate(tpl, vars) {
   return String(tpl).replace(/\{(\w+)\}/g, (all, key) => {
@@ -342,3 +363,4 @@ export function parseSearchFieldsRaw(rawJson, rawFormat) {
     return parseSearchFields(null, rawFormat)
   }
 }
+

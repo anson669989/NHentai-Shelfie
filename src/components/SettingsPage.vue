@@ -85,6 +85,32 @@
         </div>
       </div>
 
+      <!-- 分享：從瀏覽器分享時，開 App 選資料夾，或不離開瀏覽器直接收藏 -->
+      <h2>{{ t('settings.share') }}</h2>
+      <div class="card">
+        <div class="row col">
+          <span>{{ t('settings.shareMode') }}</span>
+          <div class="segmented">
+            <button
+              v-for="m in ['open', 'quick']"
+              :key="m"
+              :class="{ on: shareMode === m }"
+              @click="chooseShareMode(m)"
+            >
+              {{ t('settings.shareMode.' + m) }}
+            </button>
+          </div>
+          <span class="muted small">{{ t('settings.shareModeHint') }}</span>
+        </div>
+        <div v-if="shareMode === 'quick'" class="row col">
+          <span class="muted small">{{ t('settings.shareAutoFolders') }}</span>
+          <button class="select-like" @click="pickShareFolders">
+            <span class="folder-select-name">{{ shareSummary }}</span>
+            <span class="caret">▾</span>
+          </button>
+        </div>
+      </div>
+
       <!-- 資料夾：排序、改名、刪除與分隔線（收藏頁的資料夾篩選選單也能做，兩邊同步） -->
       <h2>{{ t('settings.folders') }}</h2>
       <div class="card">
@@ -261,7 +287,15 @@ import {
   fetchLogSummary,
   verifyChallenge,
   resetVerification,
+  listFolders,
+  getSystemFolderIds,
+  setShareMode,
+  setShareAutoFolders,
+  dataVersion,
 } from '../services/library.js'
+import { resolveAutoFolders } from '../services/quickShare.js'
+import { bookFolderLabels } from './folderRows.js'
+import { liveFolderSheet } from './bookActions.js'
 import { validateEndpointTemplate, RECENT_LIMITS, normalizeRecentLimit } from '../services/parse.js'
 import { AppError, E, toAppError } from '../services/errors.js'
 import { t, errText, LANGUAGES, currentLang } from '../i18n.js'
@@ -297,6 +331,54 @@ const exportOverdue = computed(() => {
   const s = Number(settings.last_export_at)
   return !s || Date.now() / 1000 - s > 30 * 86400
 })
+
+// ---- 分享：直接收藏時自動加入的資料夾 ----
+const shareMode = computed(() => (settings.share_mode === 'quick' ? 'quick' : 'open'))
+const shareFolderIds = ref([])
+const allFolders = ref([])
+/** 目前生效的自動加入資料夾 id（設定為空字串＝還沒設定＝只有「未讀」） */
+async function currentShareIds() {
+  allFolders.value = await listFolders()
+  const { unread } = await getSystemFolderIds()
+  return resolveAutoFolders(settings.share_auto_folders, allFolders.value, unread)
+}
+async function refreshShareIds() {
+  try {
+    shareFolderIds.value = await currentShareIds()
+  } catch (err) {
+    console.warn('share folders', err)
+  }
+}
+/** 摘要：沒勾任何使用者資料夾就以「未分類」開頭（與新增頁、最近加入的寫法相同） */
+const shareSummary = computed(() => {
+  const picked = allFolders.value
+    .filter((f) => shareFolderIds.value.includes(f.id))
+    .map((f) => ({ kind: f.kind, name: f.name }))
+  return bookFolderLabels(picked, t).join(currentLang.value === 'en' ? ', ' : '、')
+})
+async function chooseShareMode(m) {
+  try {
+    await setShareMode(m)
+  } catch (err) {
+    toast(errText(err))
+  }
+}
+async function applyShareIds(ids) {
+  await setShareAutoFolders(ids)
+  shareFolderIds.value = await currentShareIds()
+  return shareFolderIds.value
+}
+async function pickShareFolders() {
+  await liveFolderSheet(t('settings.shareAutoFolders'), {
+    getSelected: currentShareIds,
+    toggle: async (id) => {
+      const cur = await currentShareIds()
+      return applyShareIds(cur.includes(id) ? cur.filter((v) => v !== id) : [...cur, id])
+    },
+    onCreated: async (id) => applyShareIds([...(await currentShareIds()), id]),
+  })
+}
+watch(() => [props.active, dataVersion.value, settings.share_auto_folders], refreshShareIds, { immediate: true })
 
 watch(
   () => props.active,
