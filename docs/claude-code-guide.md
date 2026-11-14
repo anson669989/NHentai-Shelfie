@@ -86,7 +86,7 @@ git push -u origin feat/detail-page # push 會觸發 Actions 建 debug APK 供�
 **依任務文件做一個階段**
 
 ```
-照 docs/tasks/007-search-notes-privacy.md 做階段 C。
+照 docs/tasks/2026-11-update.md 做階段 G（docs/tasks/archive/ 是舊任務，只供參考）。
 先用 Plan Mode 列出要改的檔案，我確認後再動手。
 完成後跑 npm test 與 npm run build，並更新 CLAUDE.md、docs/DEVELOPMENT.md、README。
 ```
@@ -94,7 +94,7 @@ git push -u origin feat/detail-page # push 會觸發 Actions 建 debug APK 供�
 **新增資料表欄位**
 
 ```
-在 db.js 的 MIGRATIONS 尾端新增 v4（不改舊版本），目前到 v3。
+在 db.js 的 MIGRATIONS 尾端新增 v6（不改舊版本），目前到 v5。
 需要從 book_raw 回填的資料在 library.js 啟動後本地分批處理，不上網；
 解析器放 parse.js 並補單元測試（api-v1、api-v2 都要支援）。
 ```
