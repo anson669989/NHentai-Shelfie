@@ -1,9 +1,16 @@
 // 純函式：收藏頁的搜尋與篩選（不碰資料庫；SQL 只組參數化的 WHERE，由 library.js 執行）。
 // 三個條件的組合：標籤（且）且 資料夾（或）且 文字。
 
-/** 資料夾篩選的值：'all' | 'uncat' | 資料夾 id（整數） */
+/** 資料夾篩選的值：'all' | 'uncat' | 資料夾 id（整數；含系統資料夾「未讀」「典藏」） */
 const ALL = 'all'
 const UNCAT = 'uncat'
+
+/**
+ * 「未分類」條件（books 別名 b）：沒有加入任何使用者資料夾（kind = 'user'）。
+ * 系統資料夾（未讀、典藏）不算，所以「未分類＋未讀」可以同時成立。library.js 的 folderCounts 共用。
+ */
+export const UNCAT_SQL =
+  "NOT EXISTS (SELECT 1 FROM book_folders bf JOIN folders f ON f.id = bf.folder_id WHERE bf.gallery_id = b.gallery_id AND f.kind = 'user')"
 
 /**
  * 整理資料夾篩選：只留 'uncat' 與存在的資料夾 id（去重、維持順序）；空的或含 'all' 時回到 ['all']。
@@ -74,7 +81,7 @@ export function buildFilterWhere({ folders = [ALL], tagIds = [], text = '' } = {
   const f = normalizeFolderFilter(folders)
   if (!isAllFolders(f)) {
     const or = []
-    if (f.includes(UNCAT)) or.push('NOT EXISTS (SELECT 1 FROM book_folders bf WHERE bf.gallery_id = b.gallery_id)')
+    if (f.includes(UNCAT)) or.push(UNCAT_SQL)
     const ids = f.filter((k) => k !== UNCAT)
     if (ids.length) {
       or.push(

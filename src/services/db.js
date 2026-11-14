@@ -86,6 +86,31 @@ const MIGRATIONS = [
   );
   CREATE INDEX IF NOT EXISTS idx_book_tags_tag ON book_tags(tag_id);
   `,
+  // v4（2026-11 更新）：系統資料夾、分隔線、標籤翻譯。
+  // folders.kind：user（使用者資料夾，舊資料全是）／unread（未讀）／fav（典藏）。系統資料夾的 name 只是佔位字串，
+  // 介面一律經 folderLabel() 顯示翻譯名稱；sort_order 為負數，固定排在使用者資料夾之前。
+  // 第 2 句是保險：萬一已有同名資料夾，先改名避免 UNIQUE 衝突讓遷移失敗。
+  // folder_separators：分隔線（獨立一張表，book_folders 的外鍵只指向 folders，所以分隔線不可能被拿來分類書），
+  // 和使用者資料夾共用同一個 sort_order 序列。tag_translations：EhTagTranslation 的標籤翻譯（整批取代）。
+  `
+  ALTER TABLE folders ADD COLUMN kind TEXT NOT NULL DEFAULT 'user';
+  UPDATE folders SET name = name || '_' WHERE name IN ('::nhs-unread::', '::nhs-fav::');
+  INSERT INTO folders(name, sort_order, sort_mode, created_at, kind) VALUES ('::nhs-unread::', -2, 'added_desc', 0, 'unread');
+  INSERT INTO folders(name, sort_order, sort_mode, created_at, kind) VALUES ('::nhs-fav::', -1, 'added_desc', 0, 'fav');
+  CREATE TABLE IF NOT EXISTS folder_separators (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS tag_translations (
+    type  TEXT NOT NULL,
+    name  TEXT NOT NULL,
+    zh_cn TEXT NOT NULL,
+    zh_tw TEXT NOT NULL,
+    PRIMARY KEY (type, name)
+  );
+  `,
 ]
 
 export async function initDb() {

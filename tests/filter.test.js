@@ -9,6 +9,7 @@ import {
   buildFilterWhere,
   hasActiveFilter,
   filterTagOptions,
+  UNCAT_SQL,
 } from '../src/services/filter.js'
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf8')
@@ -93,6 +94,13 @@ describe('buildFilterWhere', () => {
     const { where, values } = buildFilterWhere({ folders: ['uncat', 2, 5] })
     expect(where).toMatch(/NOT EXISTS .* OR EXISTS .*folder_id IN \(\?,\?\)/)
     expect(values).toEqual([2, 5])
+  })
+  it('未分類只看使用者資料夾（未讀、典藏不算）', () => {
+    const { where, values } = buildFilterWhere({ folders: ['uncat'] })
+    expect(where).toBe(`(${UNCAT_SQL})`)
+    expect(where).toContain("f.kind = 'user'")
+    expect(where).toContain('JOIN folders f ON f.id = bf.folder_id')
+    expect(values).toEqual([])
   })
   it('標籤「且」：HAVING COUNT 等於勾選數', () => {
     const { where, values } = buildFilterWhere({ tagIds: [7, 8, 7] })

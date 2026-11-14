@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { parseGalleryId, parseGallery, fillTemplate, validateEndpointTemplate, sniffImageExt, normalizeFolderName } from '../src/services/parse.js'
+import { parseGalleryId, parseGallery, fillTemplate, validateEndpointTemplate, sniffImageExt, normalizeFolderName, normalizeSeparatorName } from '../src/services/parse.js'
 
 describe('parseGalleryId', () => {
   it('接受 1–7 位正整數', () => {
@@ -73,5 +73,25 @@ describe('normalizeFolderName', () => {
     expect(normalizeFolderName('   ')).toBeNull()
     expect(normalizeFolderName('a'.repeat(31))).toBeNull()
     expect(normalizeFolderName('字'.repeat(30))).toBe('字'.repeat(30))
+  })
+  it('系統資料夾的佔位名稱與控制字元不合法；換行與 Tab 折疊成空白', () => {
+    expect(normalizeFolderName('::nhs-unread::')).toBeNull()
+    expect(normalizeFolderName('  ::nhs-x')).toBeNull()
+    expect(normalizeFolderName('a\u001fb')).toBeNull()
+    expect(normalizeFolderName('a\u001eb')).toBeNull()
+    expect(normalizeFolderName('a\u0000')).toBeNull()
+    expect(normalizeFolderName('a\n\tb')).toBe('a b')
+    expect(normalizeFolderName(':nhs-ok')).toBe(':nhs-ok')
+  })
+})
+
+describe('normalizeSeparatorName', () => {
+  it('可留空、最多 30 字、空白折疊', () => {
+    expect(normalizeSeparatorName('')).toBe('')
+    expect(normalizeSeparatorName('   ')).toBe('')
+    expect(normalizeSeparatorName(null)).toBe('')
+    expect(normalizeSeparatorName('  標籤   分組 ')).toBe('標籤 分組')
+    expect(normalizeSeparatorName('字'.repeat(30))).toBe('字'.repeat(30))
+    expect(normalizeSeparatorName('字'.repeat(31))).toBeNull()
   })
 })

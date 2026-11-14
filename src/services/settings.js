@@ -36,6 +36,14 @@ export const DEFAULTS = Object.freeze({
   mama_hide_note: '0', // 隱藏備註
   folder_filter: '["all"]', // 收藏頁資料夾篩選（多選）：["all"] 或 "uncat"／資料夾 id 的陣列；文字與標籤篩選不保留
   tags_backfilled: '0', // 1 = 舊資料的標籤已從 book_raw 回填完成（schema v3）
+  sys_seeded: '0', // 1 = 已做過一次性預設：把「未讀」加進 last_folders（schema v4）
+  share_mode: 'open', // 從瀏覽器分享時：open（開 App 選資料夾）| quick（不開 App 直接收藏）
+  share_auto_folders: '', // 直接收藏時自動加入的資料夾 id（JSON 陣列）；空字串＝還沒設定＝只有「未讀」，'[]'＝都不加
+  tag_translate: '0', // 1 = 標籤篩選顯示中文翻譯
+  tagtr_sha: '', // 目前翻譯資料的版本（EhTagTranslation 的 commit sha）
+  tagtr_count: '0', // 翻譯資料筆數（設定頁顯示用）
+  tagtr_updated_at: '0', // 翻譯資料上次寫入的時間（毫秒）
+  tagtr_checked_at: '0', // 上次成功檢查更新的時間（毫秒）；滿 24 小時才再檢查
   ...DEFAULT_ENDPOINTS,
 })
 

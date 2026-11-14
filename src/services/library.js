@@ -15,7 +15,8 @@ import {
   parseSearchFieldsRaw,
   FILTER_TAG_TYPES,
 } from './parse.js'
-import { buildFilterWhere } from './filter.js'
+import { buildFilterWhere, UNCAT_SQL } from './filter.js'
+import { mergeFolderItems, isSystemKind } from './folderOrder.js'
 import { planAdd } from './addPlan.js'
 import { buildCsv, validateCsv, CSV_MAX_BYTES } from './csv.js'
 import { loadSettings, migrateSettings, setSetting, settings } from './settings.js'
@@ -37,7 +38,11 @@ import {
 
 const COVERS_DIR = 'covers'
 const PREVIEW_DIR = 'preview'
-const RESERVED_NAMES = new Set(['全部', '未分類', 'all', 'uncategorized', 'すべて', '未分類'])
+// 內建資料夾的四語名稱（比對前已轉小寫）；只在新建／改名時檢查，既有的同名資料夾不受影響
+const RESERVED_NAMES = new Set([
+  '全部', '未分類', '未分类', 'all', 'uncategorized', 'すべて',
+  '未讀', '未读', 'unread', '未読', '典藏', 'favorites', 'お気に入り',
+])
 
 /** 資料有變動時遞增，介面以 watch 重新查詢 */
 export const dataVersion = ref(0)
@@ -61,6 +66,7 @@ export async function initLibrary() {
   await initDb()
   await loadSettings()
   await migrateSettings()
+  await seedSystemDefaults().catch((e) => console.warn('seed defaults failed', e))
   setFetchLogger(writeFetchLog)
   setSettingWriter(setSetting)
 
@@ -79,6 +85,26 @@ export async function initLibrary() {
   await cleanupOrphanCovers().catch((e) => console.warn('orphan cleanup failed', e))
   await refreshPendingCount()
   backfillTags().catch((e) => console.warn('tag backfill failed', e)) // 不擋啟動，前景分批做
+}
+
+/**
+ * 一次性預設值（schema v4）：新加入的書預設放進「未讀」——把未讀資料夾加進新增頁「上次選的資料夾」。
+ * 只做一次（sys_seeded），之後使用者取消勾選會被記住；現有的書不會被標成未讀。
+ */
+async function seedSystemDefaults() {
+  if (settings.sys_seeded === '1') return
+  const { unread } = await getSystemFolderIds()
+  if (unread) {
+    let last = []
+    try {
+      last = JSON.parse(settings.last_folders || '[]')
+    } catch {
+      last = []
+    }
+    if (!Array.isArray(last)) last = []
+    if (!last.map(Number).includes(unread)) await setSetting('last_folders', JSON.stringify([...last, unread]))
+  }
+  await setSetting('sys_seeded', '1')
 }
 
 function joinSrc(base, path) {
@@ -141,9 +167,10 @@ export async function getBook(id) {
   return rows[0] || null
 }
 
+/** 一本書所在的資料夾（含系統資料夾）：[{id, name, kind}]；顯示名稱一律經 folderLabel */
 export async function getBookFolders(id) {
   return query(
-    'SELECT f.id, f.name FROM folders f JOIN book_folders bf ON bf.folder_id = f.id WHERE bf.gallery_id = ? ORDER BY f.sort_order, f.id',
+    'SELECT f.id, f.name, f.kind FROM folders f JOIN book_folders bf ON bf.folder_id = f.id WHERE bf.gallery_id = ? ORDER BY f.sort_order, f.id',
     [id],
   )
 }
@@ -226,21 +253,32 @@ async function backfillTags() {
 }
 
 /**
- * 加入頁「最近加入」：只取顯示欄位，另附所在資料夾名稱（folders: string[]，依資料夾順序）。
+ * 加入頁「最近加入」：只取顯示欄位，另附所在資料夾（folders: [{kind, name}]，依資料夾順序）。
+ * SQL 以 char(30) 相接 kind 與 name、各資料夾之間用 char(31)，在 JS 拆開。
  * @param {number|string} limit 10／20／30／40／50（其他值視為 20）
  */
 export async function listRecentBooks(limit = 20) {
   const rows = await query(
     `SELECT ${LIST_COLS},
-       (SELECT group_concat(name, char(31)) FROM (
-          SELECT f.name FROM book_folders bf JOIN folders f ON f.id = bf.folder_id
+       (SELECT group_concat(item, char(31)) FROM (
+          SELECT f.kind || char(30) || f.name AS item FROM book_folders bf JOIN folders f ON f.id = bf.folder_id
           WHERE bf.gallery_id = b.gallery_id ORDER BY f.sort_order, f.id)) AS folder_names
      FROM books b ORDER BY ${SORT_SQL.added_desc} LIMIT ?`,
     [normalizeRecentLimit(limit)],
   )
-  return rows.map(({ folder_names, ...b }) => ({ ...b, folders: folder_names ? String(folder_names).split(FOLDER_SEP) : [] }))
+  return rows.map(({ folder_names, ...b }) => ({ ...b, folders: splitFolderItems(folder_names) }))
 }
 const FOLDER_SEP = String.fromCharCode(31)
+const KIND_SEP = String.fromCharCode(30)
+function splitFolderItems(s) {
+  if (!s) return []
+  return String(s)
+    .split(FOLDER_SEP)
+    .map((x) => {
+      const i = x.indexOf(KIND_SEP)
+      return i < 0 ? { kind: 'user', name: x } : { kind: x.slice(0, i), name: x.slice(i + 1) }
+    })
+}
 
 /**
  * ⋮ 單本選單的備註：單行、不限長度；換行轉空白、去頭尾空白，空字串存成空值。
@@ -279,7 +317,7 @@ function checkId(id) {
  * - already：已在所選資料夾 → 不做事
  * - addFolders：已收藏 → 只補資料夾關聯，不重抓資料與封面
  * - new：寫入一筆「待補資料」（meta_pending），交給背景佇列；書是否存在於網站由佇列判斷
- * @returns {Promise<{kind:'new'|'already'|'addFolders', id:number, originalFolders?:string[]}>}
+ * @returns {Promise<{kind:'new'|'already'|'addFolders', id:number, originalFolders?:{kind:string, name:string}[]}>}
  */
 export async function quickAdd(id, folderIds = []) {
   id = checkId(id)
@@ -289,7 +327,7 @@ export async function quickAdd(id, folderIds = []) {
   if (plan.kind === 'already') return { kind: 'already', id }
   if (plan.kind === 'addFolders') {
     await addBooksToFolders([id], plan.toAdd)
-    return { kind: 'addFolders', id, originalFolders: existingFolders.map((f) => f.name) }
+    return { kind: 'addFolders', id, originalFolders: existingFolders.map((f) => ({ kind: f.kind, name: f.name })) }
   }
   try {
     await transaction([
@@ -522,13 +560,46 @@ export async function openBookPage(id) {
 }
 
 // ================= 資料夾 =================
+// 系統資料夾（未讀 kind='unread'、典藏 kind='fav'）是 folders 表裡的真資料夾，沿用 book_folders；
+// 不能改名、刪除、排序。「全部」「未分類」是虛擬的（介面用 'all'／'uncat'）。
+
+/** 所有資料夾（含系統資料夾，排在最前面）：[{id, name, kind, sort_order, sort_mode}] */
 export async function listFolders() {
-  return query('SELECT id, name, sort_order, sort_mode FROM folders ORDER BY sort_order, id')
+  return query('SELECT id, name, kind, sort_order, sort_mode FROM folders ORDER BY sort_order, id')
+}
+
+/** 資料夾＋分隔線，依畫面順序（系統資料夾在前）；見 folderOrder.js 的 mergeFolderItems */
+export async function listFolderItems() {
+  const folders = await listFolders()
+  const seps = await query('SELECT id, name, sort_order FROM folder_separators ORDER BY sort_order, id')
+  return mergeFolderItems(folders, seps)
+}
+
+let systemIds = null
+/** 系統資料夾的 id：{ unread, fav }（找不到為 null）；第一次查詢後快取（系統資料夾不會被刪） */
+export async function getSystemFolderIds() {
+  if (systemIds?.unread && systemIds?.fav) return systemIds
+  const rows = await query("SELECT id, kind FROM folders WHERE kind IN ('unread', 'fav')")
+  const ids = { unread: null, fav: null }
+  for (const r of rows) ids[r.kind] = Number(r.id)
+  systemIds = ids
+  return ids
+}
+
+/** 新建的資料夾或分隔線接在最後：使用者資料夾與分隔線兩張表的 sort_order 最大值（至少 0） */
+async function maxUserSortOrder() {
+  const r = await query(
+    `SELECT MAX(m) AS m FROM (
+       SELECT COALESCE(MAX(sort_order), 0) AS m FROM folders WHERE kind = 'user'
+       UNION ALL SELECT COALESCE(MAX(sort_order), 0) AS m FROM folder_separators)`,
+  )
+  return Math.max(0, Number(r[0]?.m) || 0)
 }
 
 async function validateFolderName(name, exceptId = null) {
   const n = normalizeFolderName(name)
   if (!n || RESERVED_NAMES.has(n.toLowerCase())) throw new AppError(E.FOLDER_NAME_INVALID)
+  // name 的 UNIQUE 涵蓋整張表（含系統資料夾的佔位名稱），所以重複檢查也比對整張表
   const dup = await query('SELECT id FROM folders WHERE name = ? AND id IS NOT ?', [n, exceptId])
   if (dup.length) throw new AppError(E.FOLDER_NAME_DUP)
   return n
@@ -536,10 +607,10 @@ async function validateFolderName(name, exceptId = null) {
 
 export async function createFolder(name) {
   const n = await validateFolderName(name)
-  const max = (await query('SELECT COALESCE(MAX(sort_order), 0) AS m FROM folders'))[0].m
-  const res = await run('INSERT INTO folders(name, sort_order, sort_mode, created_at) VALUES (?,?,?,?)', [
+  const max = await maxUserSortOrder()
+  const res = await run("INSERT INTO folders(name, sort_order, sort_mode, created_at, kind) VALUES (?,?,?,?, 'user')", [
     n,
-    Number(max) + 1,
+    max + 1,
     'added_desc',
     Math.floor(Date.now() / 1000),
   ])
@@ -547,27 +618,32 @@ export async function createFolder(name) {
   return res.lastId
 }
 
+/** 改名：只限使用者資料夾（系統資料夾改不動） */
 export async function renameFolder(id, name) {
   const n = await validateFolderName(name, Number(id))
-  await run('UPDATE folders SET name = ? WHERE id = ?', [n, Number(id)])
+  await run("UPDATE folders SET name = ? WHERE id = ? AND kind = 'user'", [n, Number(id)])
   bump()
 }
 
-/** 刪除資料夾只刪關聯、不刪書 */
+/** 刪除資料夾只刪關聯、不刪書；只限使用者資料夾（系統資料夾刪不掉，也不會清掉它的關聯） */
 export async function deleteFolder(id) {
   await transaction([
-    { statement: 'DELETE FROM book_folders WHERE folder_id = ?', values: [Number(id)] },
-    { statement: 'DELETE FROM folders WHERE id = ?', values: [Number(id)] },
+    {
+      statement: "DELETE FROM book_folders WHERE folder_id = (SELECT id FROM folders WHERE id = ? AND kind = 'user')",
+      values: [Number(id)],
+    },
+    { statement: "DELETE FROM folders WHERE id = ? AND kind = 'user'", values: [Number(id)] },
   ])
   bump()
 }
 
 /**
- * 依拖曳結果重排資料夾：ids 為新的順序。一個交易更新所有 sort_order，失敗整批回滾。
- * 清單中沒列到的資料夾（例如拖曳時別處新增的）接在後面，維持原本相對順序。
+ * 依拖曳結果重排使用者資料夾：ids 為新的順序。一個交易更新所有 sort_order，失敗整批回滾。
+ * 清單中沒列到的資料夾（例如拖曳時別處新增的）接在後面，維持原本相對順序；系統資料夾忽略。
+ * （階段 B 會以 reorderFolderItems 取代，屆時刪除）
  */
 export async function reorderFolders(ids) {
-  const list = await listFolders()
+  const list = (await listFolders()).filter((f) => !isSystemKind(f.kind))
   const known = new Set(list.map((f) => f.id))
   const seen = new Set()
   const order = []
@@ -581,7 +657,10 @@ export async function reorderFolders(ids) {
   for (const f of list) if (!seen.has(f.id)) order.push(f.id)
   try {
     await transaction(
-      order.map((id, idx) => ({ statement: 'UPDATE folders SET sort_order = ? WHERE id = ?', values: [idx + 1, id] })),
+      order.map((id, idx) => ({
+        statement: "UPDATE folders SET sort_order = ? WHERE id = ? AND kind = 'user'",
+        values: [idx + 1, id],
+      })),
     )
   } finally {
     bump() // 失敗時也通知，讓畫面重新讀回資料庫裡的順序
@@ -602,14 +681,13 @@ export async function setSortMode(folderKey, mode) {
   else await run('UPDATE folders SET sort_mode = ? WHERE id = ?', [mode, Number(folderKey)])
 }
 
-/** 各資料夾本數：{ all, uncat, byFolder: { [folderId]: n } } */
+/**
+ * 各資料夾本數：{ all, uncat, byFolder: { [folderId]: n } }（byFolder 含未讀、典藏）。
+ * 未分類＝沒有加入任何使用者資料夾（系統資料夾不算）。
+ */
 export async function folderCounts() {
   const all = (await query('SELECT COUNT(*) AS n FROM books'))[0].n
-  const uncat = (
-    await query(
-      'SELECT COUNT(*) AS n FROM books b WHERE NOT EXISTS (SELECT 1 FROM book_folders bf WHERE bf.gallery_id = b.gallery_id)',
-    )
-  )[0].n
+  const uncat = (await query(`SELECT COUNT(*) AS n FROM books b WHERE ${UNCAT_SQL}`))[0].n
   const byFolder = {}
   for (const r of await query('SELECT folder_id, COUNT(*) AS n FROM book_folders GROUP BY folder_id')) {
     byFolder[r.folder_id] = r.n
@@ -934,7 +1012,7 @@ export async function clearTempCache() {
 // ================= CSV =================
 export async function exportCsv() {
   const rows = await query(
-    "SELECT b.gallery_id, b.note, b.added_at, (SELECT group_concat(f.name, char(31)) FROM book_folders bf JOIN folders f ON f.id = bf.folder_id WHERE bf.gallery_id = b.gallery_id) AS folder_names FROM books b ORDER BY b.added_at, b.gallery_id",
+    "SELECT b.gallery_id, b.note, b.added_at, (SELECT group_concat(f.name, char(31)) FROM book_folders bf JOIN folders f ON f.id = bf.folder_id WHERE bf.gallery_id = b.gallery_id AND f.kind = 'user') AS folder_names FROM books b ORDER BY b.added_at, b.gallery_id",
   )
   const csv = buildCsv(
     rows.map((r) => ({
@@ -977,8 +1055,9 @@ export async function previewCsvImport(file) {
 
 /** 匯入：缺少的資料夾自動建立 → 新書以 pending 狀態存入 → 封面由佇列慢慢抓 */
 export async function commitCsvImport(okRows) {
-  const existingFolders = new Set((await listFolders()).map((f) => f.name))
-  let order = Number((await query('SELECT COALESCE(MAX(sort_order), 0) AS m FROM folders'))[0].m)
+  // 以名稱比對只看使用者資料夾（系統資料夾的佔位名稱不可能出現在 CSV，normalizeFolderName 會擋掉）
+  const existingFolders = new Set((await listFolders()).filter((f) => f.kind === 'user').map((f) => f.name))
+  let order = await maxUserSortOrder()
   const now = Math.floor(Date.now() / 1000)
   const set = []
   for (const r of okRows) {
@@ -1001,7 +1080,7 @@ export async function commitCsvImport(okRows) {
     for (const name of r.folders) {
       set.push({
         statement:
-          'INSERT OR IGNORE INTO book_folders(gallery_id, folder_id) SELECT ?, id FROM folders WHERE name = ?',
+          "INSERT OR IGNORE INTO book_folders(gallery_id, folder_id) SELECT ?, id FROM folders WHERE name = ? AND kind = 'user'",
         values: [r.gallery_id, name],
       })
     }

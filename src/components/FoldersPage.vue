@@ -34,7 +34,7 @@
           </button>
         </div>
         <button class="select-like folder-select" :aria-label="t('filter.folderTitle')" @click="openPicker">
-          <span class="folder-select-name">{{ folderLabel }}</span>
+          <span class="folder-select-name">{{ pickerLabel }}</span>
           <small v-if="folderCount != null" class="muted">({{ folderCount }})</small>
           <span class="caret">▾</span>
         </button>
@@ -94,6 +94,7 @@ import {
   listBooks,
   listTagOptions,
   listFolders,
+  listFolderItems,
   folderCounts,
   getSortMode,
   setSortMode,
@@ -118,6 +119,8 @@ import { t, errText } from '../i18n.js'
 import { actionSheet, confirmDialog, promptDialog, toast, pushBackHandler } from '../ui.js'
 import { openBook, openBookMenu, pickFoldersDialog } from './bookActions.js'
 import { viewOptions } from './viewOptions.js'
+import { folderLabel, buildFolderRows } from './folderRows.js'
+import { isSystemKind } from '../services/folderOrder.js'
 
 const props = defineProps({ active: Boolean })
 
@@ -142,14 +145,21 @@ let removeBack = null
 
 const countOf = (key) =>
   key === 'all' ? counts.value.all : key === 'uncat' ? counts.value.uncat : counts.value.byFolder[key] || 0
-/** 只篩選一個自建資料夾時才有（多選批次的「從此資料夾移除」）；「全部」「未分類」或多選為 null */
+/**
+ * 只篩選一個資料夾時才有（⋮ 與多選批次的「從此資料夾移除」）；含系統資料夾「未讀」「典藏」。
+ * 「全部」「未分類」或多選為 null
+ */
 const currentFolder = computed(() => {
   const f = folderFilter.value
   return f.length === 1 && typeof f[0] === 'number' ? folders.value.find((x) => x.id === f[0]) || null : null
 })
 const nameOf = (key) =>
-  key === 'all' ? t('folder.all') : key === 'uncat' ? t('folder.uncat') : folders.value.find((f) => f.id === key)?.name || ''
-const folderLabel = computed(() =>
+  key === 'all'
+    ? t('folder.all')
+    : key === 'uncat'
+      ? t('folder.uncat')
+      : folderLabel(folders.value.find((f) => f.id === key), t)
+const pickerLabel = computed(() =>
   folderFilter.value.length === 1 ? nameOf(folderFilter.value[0]) : t('filter.foldersN', { n: folderFilter.value.length }),
 )
 const folderCount = computed(() => (folderFilter.value.length === 1 ? countOf(folderFilter.value[0]) : null))
@@ -265,7 +275,7 @@ async function batchClassify() {
   const others = folders.value.filter((f) => f.id !== currentFolder.value?.id)
   const picked = await pickFoldersDialog(
     t('select.classifyTitle', { n: ids.length }),
-    others.map((f) => ({ label: f.name, value: f.id })),
+    others.map((f) => ({ label: folderLabel(f, t), value: f.id })),
   )
   if (!picked?.length) return
   try {
@@ -309,14 +319,29 @@ async function batchDelete() {
 // ---- 資料夾篩選（多選「或」）：勾選即時套用、選單不關；右上角「全部清除」回到「全部」 ----
 async function openPicker() {
   const row = (key, label) => ({ label: `${label} (${countOf(key)})`, value: key, check: true })
+  let items = []
+  try {
+    items = await listFolderItems()
+  } catch (e) {
+    toast(errText(e))
+    return
+  }
+  // 最上方固定四列：全部、未分類、未讀、典藏（沒有 ≡／⋯）；其後使用者資料夾可拖曳、改名、刪除
+  const sysItems = items.filter((x) => x.type === 'folder' && isSystemKind(x.kind))
+  const userRows = buildFolderRows(
+    items.filter((x) => !sysItems.includes(x)),
+    t,
+    { counts: counts.value, sortable: true },
+  )
   const action = await actionSheet(
     t('filter.folderTitle'),
     [
       row('all', t('folder.all')),
       row('uncat', t('folder.uncat')),
+      ...buildFolderRows(sysItems, t, { counts: counts.value }),
       { divider: true },
-      ...folders.value.map((f) => ({ ...row(f.id, f.name), more: true, drag: true })),
-      ...(folders.value.length ? [{ divider: true }] : []),
+      ...userRows,
+      ...(userRows.length ? [{ divider: true }] : []),
       { label: '＋ ' + t('folder.new'), value: '__new' },
     ],
     {
@@ -337,7 +362,7 @@ async function openPicker() {
   )
   if (action === '__new') return newFolder()
   if (action && typeof action === 'object' && 'more' in action) {
-    const f = folders.value.find((x) => x.id === action.more)
+    const f = folders.value.find((x) => x.id === action.more && !isSystemKind(x.kind))
     if (f && (await folderMenu(f))) openPicker() // 管理完回到選單，方便連續操作
   }
 }

@@ -71,7 +71,7 @@
               <div v-if="b.title" class="recent-name">{{ view.hideTitle ? '' : b.title }}</div>
               <div v-else class="recent-name muted">{{ t(statusKey(b)) }}</div>
               <div v-if="b.title && b.fetch_status !== 'ok'" class="muted small">{{ t(statusKey(b)) }}</div>
-              <div v-if="!view.hideFolders" class="recent-line muted">📁 {{ b.folders.length ? b.folders.join('、') : t('folder.uncat') }}</div>
+              <div v-if="!view.hideFolders" class="recent-line muted">📁 {{ folderNames(b.folders) }}</div>
               <div v-if="view.showNote" class="recent-line muted">{{ view.hideNote ? '' : b.note || '' }}</div>
             </div>
           </li>
@@ -102,6 +102,7 @@ import { checklistDialog, promptDialog, toast } from '../ui.js'
 import { statusKey, isLoadingStatus } from './bookStatus.js'
 import { openBook, openBookMenu } from './bookActions.js'
 import { viewOptions } from './viewOptions.js'
+import { folderLabel, bookFolderLabels } from './folderRows.js'
 
 const props = defineProps({ active: Boolean })
 
@@ -117,13 +118,9 @@ const broken = reactive({})
 /** 顯示備註與媽媽模式（最近加入） */
 const view = computed(() => viewOptions(settings, 'add'))
 const parsedId = computed(() => parseGalleryId(raw.value))
-const selectedNames = computed(() =>
-  folders.value
-    .filter((f) => selected.value.includes(f.id))
-    .map((f) => f.name)
-    .join('、'),
-)
-const folderNames = (list) => (list.length ? list.map((f) => f.name).join('、') : t('folder.uncat'))
+/** 資料夾顯示文字：未分類（沒有使用者資料夾時）→ 未讀 → 典藏 → 使用者資料夾 */
+const folderNames = (list) => bookFolderLabels(list, t).join('、')
+const selectedNames = computed(() => folderNames(folders.value.filter((f) => selected.value.includes(f.id))))
 
 async function loadFolders() {
   folders.value = await listFolders()
@@ -196,7 +193,7 @@ function onPaste() {
 async function pickFolders() {
   const picked = await checklistDialog(
     t('add.folders'),
-    folders.value.map((f) => ({ label: f.name, value: f.id })),
+    folders.value.map((f) => ({ label: folderLabel(f, t), value: f.id })),
     selected.value,
     {
       extraAction: {
@@ -246,7 +243,7 @@ async function submit() {
     const r = await quickAdd(id, selected.value)
     if (r.kind === 'new') toast(t('add.added', { id }))
     else if (r.kind === 'already') toast(t('add.alreadyHere', { id }))
-    else toast(t('add.addedExisting', { id, names: folderNames(r.originalFolders.map((name) => ({ name }))) }))
+    else toast(t('add.addedExisting', { id, names: folderNames(r.originalFolders) }))
     raw.value = ''
     dup.value = null
     await setSetting('last_folders', JSON.stringify(selected.value))

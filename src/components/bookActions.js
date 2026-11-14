@@ -19,6 +19,7 @@ import { normalizeNote, parseGalleryId } from '../services/parse.js'
 import { AppError, E } from '../services/errors.js'
 import { t, errText } from '../i18n.js'
 import { actionSheet, confirmDialog, promptDialog, checklistDialog, toast } from '../ui.js'
+import { folderLabel } from './folderRows.js'
 
 /** 依設定「開啟網頁方式」開該本網頁；開不起來就複製連結並提示 */
 export async function openBook(book) {
@@ -71,7 +72,7 @@ export async function pickFoldersDialog(title, items, preselected = []) {
 /**
  * 「⋮」單本選單：完整標題、備註（單行，離開輸入框自動儲存）與單本功能。
  * @param {{gallery_id:number, title?:string, fetch_status?:string}} book
- * @param {{currentFolder?: {id:number, name:string}|null}} [opts] 目前所在的自建資料夾（顯示「從此資料夾移除」）
+ * @param {{currentFolder?: {id:number, name:string, kind?:string}|null}} [opts] 目前所在的資料夾（含未讀、典藏；顯示「從此資料夾移除」）
  */
 export async function openBookMenu(book, { currentFolder = null } = {}) {
   const id = book.gallery_id
@@ -112,7 +113,7 @@ export async function openBookMenu(book, { currentFolder = null } = {}) {
       { label: t('book.copyId'), value: 'copy' },
       ...(notFound ? [{ label: t('book.changeId'), value: 'changeId' }] : [{ label: t('book.open'), value: 'open' }]),
       { label: t('book.classify'), value: 'folders' },
-      ...(f ? [{ label: t('book.removeFromFolder', { name: f.name }), value: 'remove' }] : []),
+      ...(f ? [{ label: t('book.removeFromFolder', { name: folderLabel(f, t) }), value: 'remove' }] : []),
       ...(notFound ? [] : [{ label: t('book.refetch'), value: 'refetch' }]),
       { label: t('book.delete'), value: 'delete', danger: true },
     ],
@@ -129,7 +130,7 @@ export async function openBookMenu(book, { currentFolder = null } = {}) {
       const folders = await listFolders()
       const picked = await pickFoldersDialog(
         t('book.classify'),
-        folders.map((x) => ({ label: x.name, value: x.id })),
+        folders.map((x) => ({ label: folderLabel(x, t), value: x.id })),
         before,
       )
       if (picked) await setBookFolders(id, picked)

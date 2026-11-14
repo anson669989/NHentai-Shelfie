@@ -262,12 +262,25 @@ export function isChallengePage({ status, contentType, body } = {}) {
   return (status === 403 || status === 503) && isHtml
 }
 
-/** 資料夾名稱：去頭尾空白、1–30 字。回傳整理後名稱或 null。 */
+// 控制字元（U+0000–U+001F）；空白類的（換行、Tab）會先被折疊成空白，剩下的才算不合法
+const CONTROL_CHARS = /[\u0000-\u001f]/
+
+/**
+ * 資料夾名稱：空白折疊、去頭尾空白、1–30 字。回傳整理後名稱或 null。
+ * 以 `::nhs-` 開頭（系統資料夾在資料庫裡的佔位名稱）或含控制字元的不合法。
+ */
 export function normalizeFolderName(name) {
   const s = String(name ?? '').replace(/\s+/g, ' ').trim()
   const len = [...s].length
   if (len < 1 || len > 30) return null
+  if (s.startsWith('::nhs-') || CONTROL_CHARS.test(s)) return null
   return s
+}
+
+/** 分隔線名稱：空白折疊、去頭尾空白、0–30 字（可為空字串，只顯示一條線）。超過回傳 null。 */
+export function normalizeSeparatorName(name) {
+  const s = String(name ?? '').replace(/\s+/g, ' ').trim()
+  return [...s].length > 30 ? null : s
 }
 
 /**
