@@ -63,7 +63,7 @@ function rememberMode(via) {
 
 // ---------- User-Agent（站方要求具描述性：AppName/version (contact or project URL)）----------
 let uaPromise = null
-function appUserAgent() {
+export function appUserAgent() {
   uaPromise ??= CapApp.getInfo()
     .then((i) => i?.version || '0')
     .catch(() => '0')
@@ -698,6 +698,27 @@ export async function takeSharedText() {
 export async function onShareReceived(cb) {
   try {
     return await NhWebFetch.addListener('shareReceived', () => cb())
+  } catch {
+    return null
+  }
+}
+
+// ---------- 軟鍵盤 ----------
+// Android 15 edge-to-edge 下網頁量不到鍵盤高度，由外掛讀系統的 IME insets，算出鍵盤蓋住 WebView 底部多少 CSS px。
+/** 取得目前鍵盤蓋住的高度（CSS px）；外掛不存在或失敗時回傳 0。 */
+export async function getKeyboardOverlap() {
+  try {
+    const r = await NhWebFetch.getKeyboardOverlap()
+    return Number.isFinite(r?.height) ? Math.max(0, r.height) : 0
+  } catch {
+    return 0
+  }
+}
+
+/** 鍵盤高度改變時 cb(height)；外掛不存在時安靜略過。 */
+export async function onKeyboardOverlap(cb) {
+  try {
+    return await NhWebFetch.addListener('keyboardOverlap', (e) => cb(Number.isFinite(e?.height) ? Math.max(0, e.height) : 0))
   } catch {
     return null
   }

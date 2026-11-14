@@ -112,7 +112,7 @@ import {
   hasActiveFilter,
   normalizeSearchText,
 } from '../services/filter.js'
-import { t, errText } from '../i18n.js'
+import { t, errText, currentLang } from '../i18n.js'
 import { actionSheet, confirmDialog, toast, pushBackHandler } from '../ui.js'
 import { openBook, openBookMenu, pickFoldersDialog } from './bookActions.js'
 import { viewOptions } from './viewOptions.js'
@@ -176,7 +176,7 @@ async function reload() {
     await setFolderFilter(ff, false)
     grid.value?.scrollToTop?.()
   }
-  tagOptions.value = await listTagOptions()
+  tagOptions.value = await listTagOptions(currentLang.value)
   const known = new Set(tagOptions.value.map((o) => o.id))
   if (tagIds.value.some((id) => !known.has(id))) tagIds.value = tagIds.value.filter((id) => known.has(id))
   sortMode.value = await getSortMode(sortKeyOf(folderFilter.value))
@@ -229,7 +229,7 @@ function clearAllFilters() {
 }
 
 watch(
-  () => [props.active, dataVersion.value],
+  () => [props.active, dataVersion.value, currentLang.value, settings.tag_translate],
   ([active]) => {
     if (active) reload().catch((e) => toast(errText(e)))
     else {

@@ -119,6 +119,32 @@
         </div>
       </div>
 
+      <!-- 標籤翻譯：只影響收藏頁標籤篩選的顯示；資料來自 GitHub 的 EhTagTranslation，每天最多更新一次 -->
+      <h2>{{ t('settings.tagTranslate') }}</h2>
+      <div class="card">
+        <div class="row">
+          <div class="row-text">
+            <span>{{ t('settings.tagTranslateSwitch') }}</span>
+            <span class="muted small">{{ t('settings.tagTranslateHint') }}</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" :checked="on('tag_translate')" @change="flipTagTranslate($event)" />
+            <span class="switch-track" />
+          </label>
+        </div>
+        <div class="row col">
+          <span v-if="tagTranslationState.running" class="muted small">{{ t('settings.tagTrUpdating') }}</span>
+          <span v-else-if="tagTranslationState.error" class="field-error">{{ errText(tagTranslationState.error) }}</span>
+          <span v-else class="muted small">{{ tagTrStatus }}</span>
+          <div class="btn-row">
+            <button class="btn" :disabled="tagTranslationState.running" @click="updateTagTr">
+              {{ t('settings.tagTrUpdateNow') }}
+            </button>
+          </div>
+          <span class="muted small">{{ t('settings.tagTrCredit') }}</span>
+        </div>
+      </div>
+
       <!-- 媽媽模式：只能在這裡切換 -->
       <h2>{{ t('settings.mama') }}</h2>
       <div class="card">
@@ -291,6 +317,9 @@ import {
   getSystemFolderIds,
   setShareMode,
   setShareAutoFolders,
+  setTagTranslate,
+  updateTagTranslations,
+  tagTranslationState,
   dataVersion,
 } from '../services/library.js'
 import { resolveAutoFolders } from '../services/quickShare.js'
@@ -331,6 +360,24 @@ const exportOverdue = computed(() => {
   const s = Number(settings.last_export_at)
   return !s || Date.now() / 1000 - s > 30 * 86400
 })
+
+// ---- 標籤翻譯 ----
+const tagTrStatus = computed(() => {
+  const n = Number(settings.tagtr_count)
+  if (!(n > 0)) return t('settings.tagTrNone')
+  const at = Number(settings.tagtr_updated_at)
+  return t('settings.tagTrStatus', { count: n, date: at ? new Date(at).toLocaleString(currentLang.value) : '-' })
+})
+async function flipTagTranslate(ev) {
+  try {
+    await setTagTranslate(ev.target.checked)
+  } catch (err) {
+    toast(errText(err))
+  }
+}
+function updateTagTr() {
+  updateTagTranslations({ force: true }).catch(() => {}) // 失敗訊息顯示在狀態列（tagTranslationState.error）
+}
 
 // ---- 分享：直接收藏時自動加入的資料夾 ----
 const shareMode = computed(() => (settings.share_mode === 'quick' ? 'quick' : 'open'))

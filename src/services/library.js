@@ -21,6 +21,16 @@ import { mergeFolderItems, isSystemKind, planReorder, parseItemKey } from './fol
 import { planAdd } from './addPlan.js'
 import { planQuickShareDrain, resolveAutoFolders, shareHosts } from './quickShare.js'
 import { buildCsv, validateCsv, CSV_MAX_BYTES } from './csv.js'
+import {
+  parseTagDb,
+  toTranslationRows,
+  translationStatements,
+  isUpdateDue,
+  translationColumn,
+  isSha,
+} from './tagTranslation.js'
+import { fetchTagDbSha, downloadTagDb } from './tagDbSource.js'
+import { loadCnToTw } from './zhConvert.js'
 import { loadSettings, migrateSettings, setSetting, settings } from './settings.js'
 import {
   RAW_FORMAT,
@@ -91,6 +101,7 @@ export async function initLibrary() {
   await cleanupOrphanCovers().catch((e) => console.warn('orphan cleanup failed', e))
   await refreshPendingCount()
   backfillTags().catch((e) => console.warn('tag backfill failed', e)) // 不擋啟動，前景分批做
+  maybeUpdateTagTranslations() // 不擋啟動；開關開啟且滿 24 小時才會連線
 }
 
 /**
@@ -203,13 +214,113 @@ export async function listBooks(filter, sortMode) {
   return query(`SELECT ${LIST_COLS} FROM books b ${where ? 'WHERE ' + where : ''} ORDER BY ${order}`, values)
 }
 
-/** 標籤篩選的選項：只列 tag／artist／group 且本數 > 0 的。[{id, type, name, n}] */
-export async function listTagOptions() {
+/**
+ * 標籤篩選的選項：只列 tag／artist／group 且本數 > 0 的。[{id, type, name, label, n}]
+ * label：標籤翻譯開啟且 lang 是 zh-TW／zh-CN 時，LEFT JOIN tag_translations 取得的翻譯（沒有翻譯為 null）；其他情況一律 null。
+ * 欄位名稱來自寫死的對照表（translationColumn），不會把參數拼進 SQL。
+ */
+export async function listTagOptions(lang) {
+  const col = settings.tag_translate === '1' ? translationColumn(lang) : null
+  const marks = FILTER_TAG_TYPES.map(() => '?').join(',')
+  if (!col) {
+    const rows = await query(
+      `SELECT t.id, t.type, t.name, COUNT(*) AS n FROM tags t JOIN book_tags bt ON bt.tag_id = t.id
+       WHERE t.type IN (${marks}) GROUP BY t.id`,
+      [...FILTER_TAG_TYPES],
+    )
+    return rows.map((r) => ({ ...r, label: null }))
+  }
   return query(
-    `SELECT t.id, t.type, t.name, COUNT(*) AS n FROM tags t JOIN book_tags bt ON bt.tag_id = t.id
-     WHERE t.type IN (${FILTER_TAG_TYPES.map(() => '?').join(',')}) GROUP BY t.id`,
+    `SELECT t.id, t.type, t.name, tr.${col} AS label, COUNT(*) AS n FROM tags t JOIN book_tags bt ON bt.tag_id = t.id
+     LEFT JOIN tag_translations tr ON tr.type = t.type AND tr.name = t.name
+     WHERE t.type IN (${marks}) GROUP BY t.id`,
     [...FILTER_TAG_TYPES],
   )
+}
+
+// ================= 標籤翻譯（EhTagTranslation） =================
+/** 設定頁顯示用：running＝更新中；error＝最近一次更新失敗的錯誤（AppError），成功後清除 */
+export const tagTranslationState = reactive({ running: false, error: null })
+let tagTrLastFailedAt = 0
+let tagTrPromise = null
+
+const UPSERT_SETTING_SQL =
+  'INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+
+/**
+ * 檢查並更新標籤翻譯資料。同時間只跑一個（重複呼叫共用同一個 Promise）。
+ * 流程：比對版本 sha（沒變就只更新檢查時間）→ 下載 → 解析 → 簡轉繁 → 一個交易整批取代並寫入 tagtr_* 設定。
+ * 任一步失敗：保留舊資料，錯誤放進 tagTranslationState.error 並丟出。
+ * @param {{force?: boolean}} [opts] force：略過「版本沒變就不下載」（按「立即更新」也走一樣的 sha 檢查，只有資料表是空的才強制）
+ */
+export function updateTagTranslations({ force = false } = {}) {
+  tagTrPromise ??= doUpdateTagTranslations(force).finally(() => {
+    tagTrPromise = null
+  })
+  return tagTrPromise
+}
+
+async function doUpdateTagTranslations(force) {
+  tagTranslationState.running = true
+  tagTranslationState.error = null
+  try {
+    const hasData = Number(settings.tagtr_count) > 0
+    const remoteSha = await fetchTagDbSha()
+    if (!force && hasData && isSha(remoteSha) && remoteSha === settings.tagtr_sha) {
+      await setSetting('tagtr_checked_at', String(Date.now()))
+      return { changed: false }
+    }
+    const text = await downloadTagDb()
+    let json
+    try {
+      json = JSON.parse(text)
+    } catch {
+      throw new AppError(E.TAGDB_FAILED, { cause: 'json' })
+    }
+    const parsed = parseTagDb(json)
+    const cnToTw = await loadCnToTw()
+    const rows = toTranslationRows(parsed.rows, cnToTw)
+    const now = String(Date.now())
+    const sha = parsed.sha || remoteSha
+    const values = { tagtr_sha: sha, tagtr_count: String(rows.length), tagtr_updated_at: now, tagtr_checked_at: now }
+    const set = translationStatements(rows)
+    for (const [k, v] of Object.entries(values)) set.push({ statement: UPSERT_SETTING_SQL, values: [k, v] })
+    try {
+      await transaction(set) // 整批取代與設定寫在同一個交易（規則 2）
+    } catch (err) {
+      const e = toAppError(err)
+      throw e.code === E.UNKNOWN ? new AppError(E.DB_FAILED, { cause: e.cause }) : e
+    }
+    Object.assign(settings, values)
+    bump()
+    return { changed: true, count: rows.length }
+  } catch (err) {
+    tagTrLastFailedAt = Date.now()
+    tagTranslationState.error = err instanceof AppError ? err : toAppError(err)
+    throw tagTranslationState.error
+  } finally {
+    tagTranslationState.running = false
+  }
+}
+
+/** 背景檢查：開關開啟且已到期（見 isUpdateDue）才執行；不 await、錯誤吃掉（記在 tagTranslationState.error） */
+export function maybeUpdateTagTranslations() {
+  const due = isUpdateDue({
+    enabled: settings.tag_translate === '1',
+    now: Date.now(),
+    checkedAt: Number(settings.tagtr_checked_at) || 0,
+    lastFailedAt: tagTrLastFailedAt,
+    hasData: Number(settings.tagtr_count) > 0,
+  })
+  if (!due || tagTrPromise) return
+  updateTagTranslations().catch(() => {})
+}
+
+/** 開關：打開時若還沒有資料就立刻下載（失敗不丟錯，設定頁會顯示 tagTranslationState.error） */
+export async function setTagTranslate(on) {
+  await setSetting('tag_translate', on ? '1' : '0')
+  bump()
+  if (on && !(Number(settings.tagtr_count) > 0)) updateTagTranslations({ force: true }).catch(() => {})
 }
 
 /** 一本書的標籤寫入語句（整批取代）；放進寫書名的同一個交易 */
@@ -1114,7 +1225,7 @@ export async function coversSize() {
   return { count: files.filter((f) => (typeof f === 'string' ? f : f.name) !== '.nomedia').length, bytes }
 }
 
-const TEMP_DIRS = [PREVIEW_DIR, 'refetch', 'test', 'export']
+const TEMP_DIRS = [PREVIEW_DIR, 'refetch', 'test', 'export', 'tagdb']
 
 /** 暫存資料夾（preview/、refetch/、test/、export/）的總大小；收藏封面不算在內。 */
 export async function tempCacheSize() {

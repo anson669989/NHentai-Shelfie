@@ -41,7 +41,7 @@
         <button v-for="o in list.items" :key="o.id" class="tag-row" @click="toggle(o.id)">
           <span class="sheet-box" :class="{ on: selectedSet.has(o.id) }" aria-hidden="true" />
           <span class="tag-type" :class="'tt-' + o.type">{{ t('tagType.' + o.type) }}</span>
-          <span class="tag-name">{{ o.name }}</span>
+          <span class="tag-name">{{ o.label || o.name }}</span>
           <span class="tag-count">{{ o.n }}</span>
         </button>
         <p v-if="!list.items.length" class="tag-hint">

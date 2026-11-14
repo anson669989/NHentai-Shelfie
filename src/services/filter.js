@@ -121,9 +121,9 @@ export function hasActiveFilter({ folders = [ALL], tagIds = [], text = '' } = {}
 }
 
 /**
- * 標籤選項清單：打字即時篩選（不分大小寫、比對名稱任一部分）；
+ * 標籤選項清單：打字即時篩選（不分大小寫、原文 name 或翻譯 label 任一包含關鍵字即可）；
  * 已勾選的排最上面（不受打字影響），其他依本數多到少、同本數依名稱。最多回傳 limit 筆。
- * @param {{id:number, type:string, name:string, n:number}[]} options
+ * @param {{id:number, type:string, name:string, label?:string|null, n:number}[]} options
  * @param {string} query
  * @param {Iterable<number>} selectedIds
  * @returns {{items:object[], more:number}} more：因數量上限沒列出的筆數
@@ -135,9 +135,9 @@ export function filterTagOptions(options, query, selectedIds = [], limit = 200) 
   const rest = []
   for (const o of options || []) {
     if (sel.has(o.id)) picked.push(o)
-    else if (!q || String(o.name).toLowerCase().includes(q)) rest.push(o)
+    else if (!q || String(o.name).toLowerCase().includes(q) || (o.label && String(o.label).toLowerCase().includes(q))) rest.push(o)
   }
-  const cmp = (a, b) => b.n - a.n || String(a.name).localeCompare(String(b.name))
+  const cmp = (a, b) => b.n - a.n || String(a.label || a.name).localeCompare(String(b.label || b.name))
   picked.sort(cmp)
   rest.sort(cmp)
   const all = [...picked, ...rest]

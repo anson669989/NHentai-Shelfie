@@ -1,0 +1,40 @@
+{
+  "repo": "https://github.com/EhTagTranslation/Database",
+  "head": { "sha": "0123456789abcdef0123456789abcdef01234567", "message": "sample" },
+  "version": 7,
+  "data": [
+    { "namespace": "rows", "count": 1, "data": { "reclass": { "name": "分类", "intro": "x", "links": "" } } },
+    { "namespace": "parody", "count": 1, "data": { "touhou project": { "name": "东方Project", "intro": "", "links": "" } } },
+    { "namespace": "mixed", "count": 2, "data": {
+      "group": { "name": "团体", "intro": "", "links": "" },
+      "incest": { "name": "近亲", "intro": "", "links": "" }
+    } },
+    { "namespace": "female", "count": 3, "data": {
+      "group": { "name": "群交", "intro": "", "links": "" },
+      "glasses": { "name": "眼镜", "intro": "", "links": "" },
+      "oyakodon": { "name": "母女丼", "intro": "", "links": "" }
+    } },
+    { "namespace": "male", "count": 3, "data": {
+      "glasses": { "name": "眼镜男", "intro": "", "links": "" },
+      "oyakodon": { "name": "父子丼", "intro": "", "links": "" },
+      "  Necktie ": { "name": " 领带 ", "intro": "", "links": "" }
+    } },
+    { "namespace": "other", "count": 2, "data": {
+      "full color": { "name": "全彩", "intro": "", "links": "" },
+      "blank": { "name": "   ", "intro": "", "links": "" }
+    } },
+    { "namespace": "location", "count": 1, "data": { "school": { "name": "学校", "intro": "", "links": "" } } },
+    { "namespace": "artist", "count": 4, "data": {
+      "same name": { "name": "Same Name", "intro": "", "links": "" },
+      "kana artist": { "name": "ひらがなの人", "intro": "", "links": "" },
+      "han artist": { "name": "国产作者", "intro": "", "links": "" },
+      "Upper Case": { "name": "大写作者", "intro": "", "links": "" }
+    } },
+    { "namespace": "group", "count": 2, "data": {
+      "circle x": { "name": "社团X", "intro": "", "links": "" },
+      "circle y": { "name": "サークルY", "intro": "", "links": "" }
+    } },
+    { "namespace": "character", "count": 1, "data": { "reimu": { "name": "灵梦", "intro": "", "links": "" } } },
+    { "namespace": "language", "count": 1, "data": { "chinese": { "name": "汉语", "intro": "", "links": "" } } }
+  ]
+}

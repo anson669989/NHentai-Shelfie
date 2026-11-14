@@ -145,7 +145,67 @@ public class NhWebFetchPlugin extends Plugin {
             instance = new WeakReference<>(this);
         }
         Activity activity = getActivity();
-        if (activity != null) captureShare(activity.getIntent(), false);
+        if (activity != null) {
+            captureShare(activity.getIntent(), false);
+            activity.runOnUiThread(() -> installKeyboardWatcher(activity));
+        }
+    }
+
+    // ------------------------------------------------------------------ 軟鍵盤
+    // Android 15 起 edge-to-edge 強制啟用，manifest 的 adjustResize 不再縮小視窗，網頁的 innerHeight／visualViewport
+    // 也都不會變，所以網頁自己量不到鍵盤。這裡直接讀系統的鍵盤高度（IME insets），算出「鍵盤實際蓋住 WebView 底部多少」
+    // （CSS px），用 keyboardOverlap 事件交給 src/viewport.js，讓對話框浮到鍵盤上方。
+    // 若系統已經把 WebView 縮小（舊版 Android 的 adjustResize），算出來是 0，不會重複扣。
+    private int lastImeBottomPx = 0;
+    private int lastOverlapCss = 0;
+    private boolean keyboardWatcherInstalled = false;
+
+    private void installKeyboardWatcher(Activity activity) {
+        if (keyboardWatcherInstalled) return;
+        View decor = activity.getWindow().getDecorView();
+        keyboardWatcherInstalled = true;
+        // 只讀取、不消耗：結果交回系統的預設處理，不影響其他外掛與 Capacitor 自己的邊界處理
+        ViewCompat.setOnApplyWindowInsetsListener(decor, (v, insets) -> {
+            lastImeBottomPx = insets.isVisible(WindowInsetsCompat.Type.ime())
+                ? insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+                : 0;
+            v.post(this::publishKeyboardOverlap);
+            return ViewCompat.onApplyWindowInsets(v, insets);
+        });
+        // 版面（含 Capacitor 調整 WebView 邊界）完成後再量一次
+        decor.getViewTreeObserver().addOnGlobalLayoutListener(this::publishKeyboardOverlap);
+        ViewCompat.requestApplyInsets(decor);
+    }
+
+    private void publishKeyboardOverlap() {
+        Activity activity = getActivity();
+        if (activity == null || getBridge() == null) return;
+        WebView wv = getBridge().getWebView();
+        if (wv == null) return;
+        View decor = activity.getWindow().getDecorView();
+        int overlapPx = 0;
+        if (lastImeBottomPx > 0) {
+            int[] loc = new int[2];
+            wv.getLocationInWindow(loc);
+            int webBottom = loc[1] + wv.getHeight();
+            int keyboardTop = decor.getHeight() - lastImeBottomPx;
+            overlapPx = Math.max(0, webBottom - keyboardTop);
+        }
+        float density = activity.getResources().getDisplayMetrics().density;
+        int css = Math.round(overlapPx / (density <= 0 ? 1f : density));
+        if (css == lastOverlapCss) return;
+        lastOverlapCss = css;
+        JSObject ret = new JSObject();
+        ret.put("height", css);
+        notifyListeners("keyboardOverlap", ret);
+    }
+
+    /** 目前鍵盤蓋住 WebView 底部的高度（CSS px）；JS 註冊事件前就已經開著鍵盤時用來補抓。 */
+    @PluginMethod
+    public void getKeyboardOverlap(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("height", lastOverlapCss);
+        call.resolve(ret);
     }
 
     @Override

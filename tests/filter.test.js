@@ -146,6 +146,18 @@ describe('filterTagOptions', () => {
   it('已勾選的排最上面（不受打字影響）', () => {
     expect(filterTagOptions(opts, 'glass', [2]).items.map((o) => o.id)).toEqual([2, 1, 4])
   })
+  it('標籤翻譯：打翻譯文字或原文都找得到；沒有 label 的照舊', () => {
+    const tr = [
+      { id: 1, type: 'tag', name: 'glasses', label: '眼鏡', n: 5 },
+      { id: 2, type: 'tag', name: 'big breasts', label: null, n: 9 },
+      { id: 3, type: 'artist', name: 'kuroihi', label: '黒い日', n: 2 },
+    ]
+    expect(filterTagOptions(tr, '眼鏡').items.map((o) => o.id)).toEqual([1])
+    expect(filterTagOptions(tr, 'GLASSES').items.map((o) => o.id)).toEqual([1])
+    expect(filterTagOptions(tr, 'big').items.map((o) => o.id)).toEqual([2])
+    expect(filterTagOptions(tr, '黒').items.map((o) => o.id)).toEqual([3])
+    expect(filterTagOptions(tr, '').items.map((o) => o.id)).toEqual([2, 1, 3])
+  })
   it('超過上限只回傳前 N 筆並告知剩幾筆', () => {
     const many = Array.from({ length: 250 }, (_, i) => ({ id: i + 1, type: 'tag', name: 't' + i, n: i }))
     const r = filterTagOptions(many, '', [], 200)

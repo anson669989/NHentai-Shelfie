@@ -15,6 +15,10 @@
 // NhWebFetch.peekQuickShares()              → { items: [{ id, at }] }：讀出收件匣，不清除
 // NhWebFetch.ackQuickShares({ ids })        → {}：把已寫進資料庫的 ID 從收件匣移除
 // NhWebFetch.addListener('quickShareReceived')：App 還活著時收到直接收藏（之後呼叫 peekQuickShares）
+//
+// 軟鍵盤（Android 15 edge-to-edge 下網頁量不到鍵盤）：
+// NhWebFetch.getKeyboardOverlap()           → { height }：鍵盤蓋住 WebView 底部的高度（CSS px）
+// NhWebFetch.addListener('keyboardOverlap') ：高度改變時 { height }
 import { registerPlugin } from '@capacitor/core'
 
 export const NhWebFetch = registerPlugin('NhWebFetch')

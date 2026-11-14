@@ -44,6 +44,7 @@ import {
   drainQuickShares,
   setShareLabels,
   sharedInput,
+  maybeUpdateTagTranslations,
 } from './services/library.js'
 import { settings } from './services/settings.js'
 import { t, currentLang } from './i18n.js'
@@ -98,6 +99,7 @@ onMounted(async () => {
       if (isActive) {
         drainShares()
         runQueue().catch(() => {})
+        maybeUpdateTagTranslations()
       } else stopQueue()
     }),
   )
