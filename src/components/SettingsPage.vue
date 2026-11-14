@@ -119,7 +119,8 @@
         </div>
       </div>
 
-      <!-- 標籤翻譯：只影響收藏頁標籤篩選的顯示；資料來自 GitHub 的 EhTagTranslation，每天最多更新一次 -->
+      <!-- 標籤翻譯：只影響收藏頁標籤篩選的顯示；資料來自 GitHub（中文：EhTagTranslation；日文：EhPanda Tag Database），
+           只下載目前介面語言那一份，每天最多更新一次；英文介面沒有翻譯 -->
       <h2>{{ t('settings.tagTranslate') }}</h2>
       <div class="card">
         <div class="row">
@@ -133,15 +134,17 @@
           </label>
         </div>
         <div class="row col">
-          <span v-if="tagTranslationState.running" class="muted small">{{ t('settings.tagTrUpdating') }}</span>
-          <span v-else-if="tagTranslationState.error" class="field-error">{{ errText(tagTranslationState.error) }}</span>
+          <span v-if="!tagTrDataset" class="muted small">{{ t('settings.tagTrNoLang') }}</span>
+          <span v-else-if="tagTranslationState.running" class="muted small">{{ t('settings.tagTrUpdating') }}</span>
+          <span v-else-if="tagTrError" class="field-error">{{ errText(tagTrError) }}</span>
           <span v-else class="muted small">{{ tagTrStatus }}</span>
           <div class="btn-row">
-            <button class="btn" :disabled="tagTranslationState.running" @click="updateTagTr">
+            <button class="btn" :disabled="!tagTrDataset || tagTranslationState.running" @click="updateTagTr">
               {{ t('settings.tagTrUpdateNow') }}
             </button>
           </div>
           <span class="muted small">{{ t('settings.tagTrCredit') }}</span>
+          <span class="muted small">{{ t('settings.tagTrCreditJa') }}</span>
         </div>
       </div>
 
@@ -323,6 +326,8 @@ import {
   dataVersion,
 } from '../services/library.js'
 import { resolveAutoFolders } from '../services/quickShare.js'
+import { tagDataset, tagtrKeys } from '../services/tagTranslation.js'
+import { hasLayoutMeta } from '../services/csv.js'
 import { bookFolderLabels } from './folderRows.js'
 import { liveFolderSheet } from './bookActions.js'
 import { validateEndpointTemplate, RECENT_LIMITS, normalizeRecentLimit } from '../services/parse.js'
@@ -361,11 +366,18 @@ const exportOverdue = computed(() => {
   return !s || Date.now() / 1000 - s > 30 * 86400
 })
 
-// ---- 標籤翻譯 ----
+// ---- 標籤翻譯（狀態列只顯示目前介面語言那一份資料：中文 tagtr_*、日文 tagtr_ja_*；英文沒有） ----
+const tagTrDataset = computed(() => tagDataset(currentLang.value))
+/** 只顯示屬於目前語言那一份資料的錯誤（例：日文更新失敗，切到中文介面時不顯示） */
+const tagTrError = computed(() =>
+  tagTranslationState.error && tagTranslationState.dataset === tagTrDataset.value ? tagTranslationState.error : null,
+)
 const tagTrStatus = computed(() => {
-  const n = Number(settings.tagtr_count)
+  const keys = tagtrKeys(tagTrDataset.value)
+  if (!keys) return t('settings.tagTrNoLang')
+  const n = Number(settings[keys.count])
   if (!(n > 0)) return t('settings.tagTrNone')
-  const at = Number(settings.tagtr_updated_at)
+  const at = Number(settings[keys.updatedAt])
   return t('settings.tagTrStatus', { count: n, date: at ? new Date(at).toLocaleString(currentLang.value) : '-' })
 })
 async function flipTagTranslate(ev) {
@@ -479,17 +491,21 @@ async function doImport(ev) {
       .slice(0, 20)
       .map((s) => '・' + t('import.reason.' + s.reason, { line: s.line }))
       .join('\n')
+    // CSV v2 的中繼列（資料夾順序、分隔線、分享設定）：有的話預覽多一句說明，沒有新書也能按「匯入」還原
+    const withLayout = hasLayoutMeta(res.meta)
     const msg =
       t('import.preview', { ok: res.ok.length, skip: res.skipped.length }) +
+      (withLayout ? `\n${t('import.layout')}` : '') +
       (res.skipped.length ? `\n\n${t('import.reasons')}\n${reasons}${res.skipped.length > 20 ? '\n…' : ''}` : '')
-    if (!res.ok.length) {
+    if (!res.ok.length && !withLayout) {
       await alertDialog(msg)
       return
     }
     const ok = await confirmDialog(msg, { okText: t('import.confirm') })
     if (!ok) return
-    await commitCsvImport(res.ok)
-    toast(t('import.done', { n: res.ok.length }), 3500)
+    await commitCsvImport(res.ok, res.meta)
+    // 沒有新書、只還原版面與設定時，不顯示「已匯入 0 筆」
+    toast(res.ok.length ? t('import.done', { n: res.ok.length }) : t('settings.saved'), 3500)
     runQueue().catch((e) => toast(errText(toAppError(e))))
   } catch (err) {
     toast(errText(toAppError(err)), 3500)

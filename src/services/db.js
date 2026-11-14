@@ -111,6 +111,17 @@ const MIGRATIONS = [
     PRIMARY KEY (type, name)
   );
   `,
+  // v5（2026-11 更新，階段 F）：日文標籤翻譯（EhPanda Tag Database 的 ja.json）。
+  // 另開一張表、不在 tag_translations 加欄位：兩種語言的來源、版本、更新時間都不同，且各自整批取代
+  // （放同一張表的話更新中文會把日文一起刪掉；zh_cn／zh_tw 又是 NOT NULL，只有日文的項目存不進去）。
+  `
+  CREATE TABLE IF NOT EXISTS tag_translations_ja (
+    type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    ja   TEXT NOT NULL,
+    PRIMARY KEY (type, name)
+  );
+  `,
 ]
 
 export async function initDb() {

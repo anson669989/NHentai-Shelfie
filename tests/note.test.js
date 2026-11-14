@@ -41,6 +41,7 @@ describe('CSV 備註一來一回', () => {
     ]
     const res = validateCsv(buildCsv(rows))
     expect(res.skipped).toEqual([])
-    expect(res.ok).toEqual(rows)
+    // CSV v2：每筆多一個 system（沒有系統資料夾＝空陣列）
+    expect(res.ok).toEqual(rows.map((r) => ({ ...r, system: [] })))
   })
 })

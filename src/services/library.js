@@ -20,16 +20,21 @@ import { buildFilterWhere, UNCAT_SQL } from './filter.js'
 import { mergeFolderItems, isSystemKind, planReorder, parseItemKey } from './folderOrder.js'
 import { planAdd } from './addPlan.js'
 import { planQuickShareDrain, resolveAutoFolders, shareHosts } from './quickShare.js'
-import { buildCsv, validateCsv, CSV_MAX_BYTES } from './csv.js'
+import { buildCsv, validateCsv, planLayoutImport, CSV_MAX_BYTES, CSV_SORT_MODES, SYSTEM_CODES } from './csv.js'
 import {
   parseTagDb,
   toTranslationRows,
   translationStatements,
+  jaTranslationStatements,
   isUpdateDue,
-  translationColumn,
+  translationSource,
+  tagDataset,
+  tagtrKeys,
   isSha,
+  isSha256,
+  MIN_TAGDB_ROWS,
 } from './tagTranslation.js'
-import { fetchTagDbSha, downloadTagDb } from './tagDbSource.js'
+import { fetchTagDbVersion, downloadTagDb } from './tagDbSource.js'
 import { loadCnToTw } from './zhConvert.js'
 import { loadSettings, migrateSettings, setSetting, settings } from './settings.js'
 import {
@@ -216,13 +221,14 @@ export async function listBooks(filter, sortMode) {
 
 /**
  * 標籤篩選的選項：只列 tag／artist／group 且本數 > 0 的。[{id, type, name, label, n}]
- * label：標籤翻譯開啟且 lang 是 zh-TW／zh-CN 時，LEFT JOIN tag_translations 取得的翻譯（沒有翻譯為 null）；其他情況一律 null。
- * 欄位名稱來自寫死的對照表（translationColumn），不會把參數拼進 SQL。
+ * label：標籤翻譯開啟且 lang 有對應的翻譯資料（zh-TW／zh-CN → tag_translations，ja → tag_translations_ja）時，
+ * LEFT JOIN 取得的翻譯（沒有翻譯為 null）；其他情況一律 null。
+ * 表名與欄位名只來自寫死的對照表（translationSource），不會把參數拼進 SQL。
  */
 export async function listTagOptions(lang) {
-  const col = settings.tag_translate === '1' ? translationColumn(lang) : null
+  const src = settings.tag_translate === '1' ? translationSource(lang) : null
   const marks = FILTER_TAG_TYPES.map(() => '?').join(',')
-  if (!col) {
+  if (!src) {
     const rows = await query(
       `SELECT t.id, t.type, t.name, COUNT(*) AS n FROM tags t JOIN book_tags bt ON bt.tag_id = t.id
        WHERE t.type IN (${marks}) GROUP BY t.id`,
@@ -231,71 +237,95 @@ export async function listTagOptions(lang) {
     return rows.map((r) => ({ ...r, label: null }))
   }
   return query(
-    `SELECT t.id, t.type, t.name, tr.${col} AS label, COUNT(*) AS n FROM tags t JOIN book_tags bt ON bt.tag_id = t.id
-     LEFT JOIN tag_translations tr ON tr.type = t.type AND tr.name = t.name
+    `SELECT t.id, t.type, t.name, tr.${src.column} AS label, COUNT(*) AS n FROM tags t JOIN book_tags bt ON bt.tag_id = t.id
+     LEFT JOIN ${src.table} tr ON tr.type = t.type AND tr.name = t.name
      WHERE t.type IN (${marks}) GROUP BY t.id`,
     [...FILTER_TAG_TYPES],
   )
 }
 
-// ================= 標籤翻譯（EhTagTranslation） =================
-/** 設定頁顯示用：running＝更新中；error＝最近一次更新失敗的錯誤（AppError），成功後清除 */
-export const tagTranslationState = reactive({ running: false, error: null })
-let tagTrLastFailedAt = 0
-let tagTrPromise = null
+// ================= 標籤翻譯（中文：EhTagTranslation；日文：EhPanda Tag Database） =================
+// 兩份資料各自整批取代、各記各的設定鍵（tagtrKeys），只處理「目前介面語言」那一份（tagDataset）。
+// 服務層不 import i18n：介面語言由 App.vue 經 setTagLang 傳進來；還沒設定過語言時所有更新函式都不做事。
+/**
+ * 設定頁顯示用：running＝更新中；error＝最近一次更新失敗的錯誤（AppError），成功後清除；
+ * dataset＝最近一次執行的是哪一份（'zh'／'ja'／null），設定頁用它判斷錯誤是不是屬於目前語言。
+ */
+export const tagTranslationState = reactive({ running: false, error: null, dataset: null })
+const tagTrLastFailedAt = { zh: 0, ja: 0 } // 失敗後 1 小時內不重試，兩份資料各記各的
+const tagTrPromises = {} // dataset → 執行中（或排隊中）的 Promise：同一份重複呼叫共用
+let tagTrChain = Promise.resolve() // 不同份資料不同時跑：一條 Promise 鏈依序執行
+let tagLang = ''
 
 const UPSERT_SETTING_SQL =
   'INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
 
-/**
- * 檢查並更新標籤翻譯資料。同時間只跑一個（重複呼叫共用同一個 Promise）。
- * 流程：比對版本 sha（沒變就只更新檢查時間）→ 下載 → 解析 → 簡轉繁 → 一個交易整批取代並寫入 tagtr_* 設定。
- * 任一步失敗：保留舊資料，錯誤放進 tagTranslationState.error 並丟出。
- * @param {{force?: boolean}} [opts] force：略過「版本沒變就不下載」（按「立即更新」也走一樣的 sha 檢查，只有資料表是空的才強制）
- */
-export function updateTagTranslations({ force = false } = {}) {
-  tagTrPromise ??= doUpdateTagTranslations(force).finally(() => {
-    tagTrPromise = null
-  })
-  return tagTrPromise
+/** 介面語言（由 App.vue 在 initLibrary 之後與切換語言時呼叫）；記住後依新語言檢查一次是否需要更新（不 await） */
+export function setTagLang(lang) {
+  tagLang = typeof lang === 'string' ? lang : ''
+  maybeUpdateTagTranslations()
 }
 
-async function doUpdateTagTranslations(force) {
+/**
+ * 檢查並更新「目前介面語言那一份」標籤翻譯資料。英文介面或還沒設定語言 → 直接回傳 { changed: false }，不連線。
+ * 同一份資料重複呼叫共用同一個 Promise；不同份資料排在前一個結束之後跑。
+ * 流程：比對版本（沒變就只更新檢查時間）→ 下載 → 解析 → 筆數檢查 →（中文：簡轉繁）→ 一個交易整批取代並寫入該份的四個設定。
+ * 任一步失敗：保留舊資料，錯誤放進 tagTranslationState.error 並丟出。
+ * @param {{force?: boolean}} [opts] force：略過「版本沒變就不下載」
+ */
+export function updateTagTranslations({ force = false } = {}) {
+  const dataset = tagDataset(tagLang)
+  if (!dataset) return Promise.resolve({ changed: false })
+  if (tagTrPromises[dataset]) return tagTrPromises[dataset]
+  const p = tagTrChain
+    .catch(() => {})
+    .then(() => doUpdateTagTranslations(dataset, force))
+    .finally(() => {
+      if (tagTrPromises[dataset] === p) delete tagTrPromises[dataset]
+    })
+  tagTrPromises[dataset] = p
+  tagTrChain = p.catch(() => {})
+  return p
+}
+
+async function doUpdateTagTranslations(dataset, force) {
+  const keys = tagtrKeys(dataset)
   tagTranslationState.running = true
   tagTranslationState.error = null
+  tagTranslationState.dataset = dataset
   try {
-    const hasData = Number(settings.tagtr_count) > 0
-    const remoteSha = await fetchTagDbSha()
-    if (!force && hasData && isSha(remoteSha) && remoteSha === settings.tagtr_sha) {
-      await setSetting('tagtr_checked_at', String(Date.now()))
+    const hasData = Number(settings[keys.count]) > 0
+    const remote = await fetchTagDbVersion(dataset)
+    const known = dataset === 'zh' ? isSha(remote) : isSha256(remote)
+    if (!force && hasData && known && remote === settings[keys.sha]) {
+      await setSetting(keys.checkedAt, String(Date.now()))
       return { changed: false }
     }
-    const text = await downloadTagDb()
-    let json
-    try {
-      json = JSON.parse(text)
-    } catch {
-      throw new AppError(E.TAGDB_FAILED, { cause: 'json' })
+    const parsed = parseTagDb(parseTagDbText(await downloadTagDb(dataset)))
+    if (parsed.rows.length < MIN_TAGDB_ROWS) {
+      throw new AppError(E.TAGDB_FAILED, { cause: `too few rows: ${parsed.rows.length}` })
     }
-    const parsed = parseTagDb(json)
-    const cnToTw = await loadCnToTw()
-    const rows = toTranslationRows(parsed.rows, cnToTw)
+    let set
+    let sha
+    if (dataset === 'zh') {
+      const cnToTw = await loadCnToTw()
+      set = translationStatements(toTranslationRows(parsed.rows, cnToTw))
+      sha = parsed.sha || remote
+    } else {
+      set = jaTranslationStatements(parsed.rows) // 日文名稱原樣存，不載入 opencc-js
+      sha = known ? remote : '' // 取不到版本：存空字串，下次檢查會再下載一次（正常）
+    }
     const now = String(Date.now())
-    const sha = parsed.sha || remoteSha
-    const values = { tagtr_sha: sha, tagtr_count: String(rows.length), tagtr_updated_at: now, tagtr_checked_at: now }
-    const set = translationStatements(rows)
-    for (const [k, v] of Object.entries(values)) set.push({ statement: UPSERT_SETTING_SQL, values: [k, v] })
-    try {
-      await transaction(set) // 整批取代與設定寫在同一個交易（規則 2）
-    } catch (err) {
-      const e = toAppError(err)
-      throw e.code === E.UNKNOWN ? new AppError(E.DB_FAILED, { cause: e.cause }) : e
+    const values = {
+      [keys.sha]: sha,
+      [keys.count]: String(parsed.rows.length),
+      [keys.updatedAt]: now,
+      [keys.checkedAt]: now,
     }
-    Object.assign(settings, values)
-    bump()
-    return { changed: true, count: rows.length }
+    await writeTagTranslations(set, values)
+    return { changed: true, count: parsed.rows.length }
   } catch (err) {
-    tagTrLastFailedAt = Date.now()
+    tagTrLastFailedAt[dataset] = Date.now()
     tagTranslationState.error = err instanceof AppError ? err : toAppError(err)
     throw tagTranslationState.error
   } finally {
@@ -303,24 +333,49 @@ async function doUpdateTagTranslations(force) {
   }
 }
 
-/** 背景檢查：開關開啟且已到期（見 isUpdateDue）才執行；不 await、錯誤吃掉（記在 tagTranslationState.error） */
+function parseTagDbText(text) {
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new AppError(E.TAGDB_FAILED, { cause: 'json' })
+  }
+}
+
+/** 整批取代與設定寫在同一個交易（規則 2）；交易成功後才更新記憶體中的 settings，並讓畫面重新查詢 */
+async function writeTagTranslations(set, values) {
+  for (const [k, v] of Object.entries(values)) set.push({ statement: UPSERT_SETTING_SQL, values: [k, v] })
+  try {
+    await transaction(set)
+  } catch (err) {
+    const e = toAppError(err)
+    throw e.code === E.UNKNOWN ? new AppError(E.DB_FAILED, { cause: e.cause }) : e
+  }
+  Object.assign(settings, values)
+  bump()
+}
+
+/** 背景檢查：開關開啟、目前語言有翻譯資料且已到期（見 isUpdateDue）才執行；不 await、錯誤吃掉（記在 tagTranslationState.error） */
 export function maybeUpdateTagTranslations() {
+  const dataset = tagDataset(tagLang)
+  if (!dataset || tagTrPromises[dataset]) return
+  const keys = tagtrKeys(dataset)
   const due = isUpdateDue({
     enabled: settings.tag_translate === '1',
     now: Date.now(),
-    checkedAt: Number(settings.tagtr_checked_at) || 0,
-    lastFailedAt: tagTrLastFailedAt,
-    hasData: Number(settings.tagtr_count) > 0,
+    checkedAt: Number(settings[keys.checkedAt]) || 0,
+    lastFailedAt: tagTrLastFailedAt[dataset],
+    hasData: Number(settings[keys.count]) > 0,
   })
-  if (!due || tagTrPromise) return
+  if (!due) return
   updateTagTranslations().catch(() => {})
 }
 
-/** 開關：打開時若還沒有資料就立刻下載（失敗不丟錯，設定頁會顯示 tagTranslationState.error） */
+/** 開關：打開時若目前語言那一份還沒有資料就立刻下載（失敗不丟錯，設定頁會顯示 tagTranslationState.error） */
 export async function setTagTranslate(on) {
   await setSetting('tag_translate', on ? '1' : '0')
   bump()
-  if (on && !(Number(settings.tagtr_count) > 0)) updateTagTranslations({ force: true }).catch(() => {})
+  const keys = tagtrKeys(tagDataset(tagLang))
+  if (on && keys && !(Number(settings[keys.count]) > 0)) updateTagTranslations({ force: true }).catch(() => {})
 }
 
 /** 一本書的標籤寫入語句（整批取代）；放進寫書名的同一個交易 */
@@ -1248,9 +1303,37 @@ export async function clearTempCache() {
 }
 
 // ================= CSV =================
+// 格式 v2（見 csv.js）：書的列多 system 欄（unread／fav）；中繼列備份資料夾與分隔線的順序、各資料夾的排序方式、快速分享設定。
+
+/** 匯出用的版面與設定（中繼列）：使用者資料夾＋分隔線依畫面順序；快速分享的兩項設定 */
+async function csvMeta() {
+  const items = await listFolderItems()
+  const layout = items
+    .filter((x) => !isSystemKind(x.kind))
+    .map((x) => (x.type === 'folder' ? { type: 'folder', name: x.name, sortMode: x.sort_mode } : { type: 'separator', name: x.name }))
+  const meta = { layout, settings: { share_mode: settings.share_mode === 'quick' ? 'quick' : 'open' } }
+  // 自動加入的資料夾還沒設定過（空字串）時不輸出：匯入端也維持「未設定＝只有未讀」
+  if (settings.share_auto_folders !== '') {
+    const folders = items.filter((x) => x.type === 'folder')
+    const { unread } = await getSystemFolderIds()
+    const ids = resolveAutoFolders(settings.share_auto_folders, folders, unread)
+    const picked = folders.filter((f) => ids.includes(f.id))
+    meta.settings.share_auto_system = picked.filter((f) => isSystemKind(f.kind)).map((f) => f.kind)
+    meta.settings.share_auto_folders = picked.filter((f) => !isSystemKind(f.kind)).map((f) => f.name)
+  }
+  return meta
+}
+
 export async function exportCsv() {
+  // 先處理快速分享的收件匣，確保剛分享的書也在備份裡（失敗不擋匯出）
+  await drainQuickShares().catch((e) => console.warn('drain before export failed', e))
   const rows = await query(
-    "SELECT b.gallery_id, b.note, b.added_at, (SELECT group_concat(f.name, char(31)) FROM book_folders bf JOIN folders f ON f.id = bf.folder_id WHERE bf.gallery_id = b.gallery_id AND f.kind = 'user') AS folder_names FROM books b ORDER BY b.added_at, b.gallery_id",
+    `SELECT b.gallery_id, b.note, b.added_at,
+       (SELECT group_concat(f.name, char(31)) FROM book_folders bf JOIN folders f ON f.id = bf.folder_id
+          WHERE bf.gallery_id = b.gallery_id AND f.kind = 'user') AS folder_names,
+       (SELECT group_concat(f.kind, char(31)) FROM book_folders bf JOIN folders f ON f.id = bf.folder_id
+          WHERE bf.gallery_id = b.gallery_id AND f.kind IN ('unread', 'fav')) AS system_kinds
+     FROM books b ORDER BY b.added_at, b.gallery_id`,
   )
   const csv = buildCsv(
     rows.map((r) => ({
@@ -1258,7 +1341,9 @@ export async function exportCsv() {
       note: r.note,
       added_at: r.added_at,
       folders: r.folder_names ? String(r.folder_names).split('\u001f') : [],
+      system: r.system_kinds ? String(r.system_kinds).split('\u001f') : [],
     })),
+    await csvMeta(),
   )
   const d = new Date()
   const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
@@ -1291,19 +1376,57 @@ export async function previewCsvImport(file) {
   return res
 }
 
-/** 匯入：缺少的資料夾自動建立 → 新書以 pending 狀態存入 → 封面由佇列慢慢抓 */
-export async function commitCsvImport(okRows) {
+/**
+ * 匯入（一個交易）：
+ * 1. 版面（CSV v2 有 #folder／#separator 時）：依 planLayoutImport 建立缺少的資料夾與分隔線、整體重排
+ *    （CSV 列出的在前，本機多出的接在後面）；舊版 CSV 沒有版面 → 維持原本行為。
+ * 2. 書裡提到、但版面沒列到的資料夾：自動建立在最後。
+ * 3. 新書以 meta_pending 存入；使用者資料夾以名稱、系統資料夾（system 欄）以 kind 加入。已收藏的書在預覽時已整列跳過。
+ * 交易後另外寫快速分享設定（需要新資料夾的 id；失敗不影響已匯入的書）。
+ * @param {object[]} okRows validateCsv 的 ok
+ * @param {object} [meta] validateCsv 的 meta（舊版 CSV 為空）
+ */
+export async function commitCsvImport(okRows, meta = null) {
   // 以名稱比對只看使用者資料夾（系統資料夾的佔位名稱不可能出現在 CSV，normalizeFolderName 會擋掉）
   const existingFolders = new Set((await listFolders()).filter((f) => f.kind === 'user').map((f) => f.name))
-  let order = await maxUserSortOrder()
   const now = Math.floor(Date.now() / 1000)
   const set = []
+  let order
+  const layout = Array.isArray(meta?.layout) ? meta.layout : []
+  if (layout.length) {
+    const local = (await listFolderItems()).filter((x) => !isSystemKind(x.kind))
+    const plan = planLayoutImport(local, layout).order
+    plan.forEach((it, idx) => {
+      const sort = idx + 1
+      if (it.type === 'folder') {
+        if (it.existingId != null) {
+          set.push({ statement: "UPDATE folders SET sort_order = ? WHERE id = ? AND kind = 'user'", values: [sort, it.existingId] })
+        } else if (!existingFolders.has(it.name)) {
+          existingFolders.add(it.name)
+          set.push({
+            statement: "INSERT OR IGNORE INTO folders(name, sort_order, sort_mode, created_at, kind) VALUES (?,?,?,?, 'user')",
+            values: [it.name, sort, CSV_SORT_MODES.includes(it.sortMode) ? it.sortMode : 'added_desc', now],
+          })
+        }
+      } else if (it.existingId != null) {
+        set.push({ statement: 'UPDATE folder_separators SET sort_order = ? WHERE id = ?', values: [sort, it.existingId] })
+      } else {
+        set.push({
+          statement: 'INSERT INTO folder_separators(name, sort_order, created_at) VALUES (?,?,?)',
+          values: [it.name, sort, now],
+        })
+      }
+    })
+    order = plan.length
+  } else {
+    order = await maxUserSortOrder()
+  }
   for (const r of okRows) {
     for (const name of r.folders) {
       if (!existingFolders.has(name)) {
         existingFolders.add(name)
         set.push({
-          statement: 'INSERT OR IGNORE INTO folders(name, sort_order, sort_mode, created_at) VALUES (?,?,?,?)',
+          statement: "INSERT OR IGNORE INTO folders(name, sort_order, sort_mode, created_at, kind) VALUES (?,?,?,?, 'user')",
           values: [name, ++order, 'added_desc', now],
         })
       }
@@ -1322,12 +1445,52 @@ export async function commitCsvImport(okRows) {
         values: [r.gallery_id, name],
       })
     }
+    // 系統資料夾（未讀、典藏）以 kind 找；舊版 CSV 沒有 system 欄 → 不加入任何系統資料夾
+    for (const kind of (r.system || []).filter((k) => SYSTEM_CODES.includes(k))) {
+      set.push({
+        statement: 'INSERT OR IGNORE INTO book_folders(gallery_id, folder_id) SELECT ?, id FROM folders WHERE kind = ?',
+        values: [r.gallery_id, kind],
+      })
+    }
   }
-  await transaction(set)
+  try {
+    await transaction(set)
+  } catch (err) {
+    throw dbError(err)
+  }
+  await importShareSettings(meta?.settings).catch((e) => console.warn('import share settings failed', e))
   await refreshPendingCount()
   bump()
   runQueue()
   pushQuickShareConfig()
+}
+
+/**
+ * 還原快速分享的兩項設定（CSV 的 #setting 列）：直接覆蓋本機。
+ * share_auto_system（unread／fav）與 share_auto_folders（使用者資料夾名稱）換成 id；找不到的名稱略過。
+ * 兩者都沒出現（CSV 匯出時還沒設定過）→ 不動本機的自動加入設定。
+ */
+async function importShareSettings(st) {
+  if (!st || typeof st !== 'object') return
+  const values = {}
+  if (st.share_mode === 'open' || st.share_mode === 'quick') values.share_mode = st.share_mode
+  if (Array.isArray(st.share_auto_system) || Array.isArray(st.share_auto_folders)) {
+    const folders = await listFolders()
+    const ids = []
+    for (const kind of st.share_auto_system || []) {
+      const f = folders.find((x) => x.kind === kind && isSystemKind(kind))
+      if (f && !ids.includes(f.id)) ids.push(f.id)
+    }
+    for (const name of st.share_auto_folders || []) {
+      const f = folders.find((x) => x.kind === 'user' && x.name === name)
+      if (f && !ids.includes(f.id)) ids.push(f.id)
+    }
+    values.share_auto_folders = JSON.stringify(ids)
+  }
+  const entries = Object.entries(values)
+  if (!entries.length) return
+  await transaction(entries.map(([k, v]) => ({ statement: UPSERT_SETTING_SQL, values: [k, v] })))
+  Object.assign(settings, values)
 }
 
 export { setSetting, settings }

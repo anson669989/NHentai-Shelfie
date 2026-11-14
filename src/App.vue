@@ -45,6 +45,7 @@ import {
   setShareLabels,
   sharedInput,
   maybeUpdateTagTranslations,
+  setTagLang,
 } from './services/library.js'
 import { settings } from './services/settings.js'
 import { t, currentLang } from './i18n.js'
@@ -71,6 +72,8 @@ onMounted(async () => {
   try {
     await initLibrary()
     ready.value = true
+    // 標籤翻譯只處理目前介面語言那一份資料（服務層不 import i18n，語言由這裡傳進去；不 await 更新）
+    setTagLang(currentLang.value)
   } catch (err) {
     console.error(err)
     initError.value = `初始化失敗 / Init failed: ${err?.message || err}`
@@ -137,8 +140,10 @@ async function drainShares() {
     console.warn('drain quick shares failed', e)
   }
 }
-watch(currentLang, () => {
-  if (ready.value) pushShareLabels()
+watch(currentLang, (lang) => {
+  if (!ready.value) return
+  pushShareLabels()
+  setTagLang(lang) // 開關開著時，依新語言檢查一次（沒有資料就下載，有資料照 24 小時規則）
 })
 watch(sharedInput, (v) => {
   if (v) tab.value = 'add'

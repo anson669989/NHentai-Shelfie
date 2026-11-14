@@ -1,10 +1,15 @@
-// 標籤翻譯（EhTagTranslation/Database 的 db.text.json）的純函式：解析、簡繁轉換列、寫入語句、更新判斷。
-// 無 I/O。只取 tag／artist／group 三類、且「翻譯與原文不同」的項目，只用 name（不存 intro 與 links）。
+// 標籤翻譯的純函式：解析、簡繁轉換列、寫入語句、更新判斷、介面語言對應的資料。無 I/O。
+// 同時處理兩份資料（結構相同，都用 parseTagDb 解析）：
+// - 中文（dataset 'zh'）：EhTagTranslation/Database 的 db.text.json → tag_translations(zh_cn, zh_tw)
+// - 日文（dataset 'ja'）：EhPanda Tag Database 的 ja.json（沒有 head／sha）→ tag_translations_ja(ja)
+// 只取 tag／artist／group 三類、且「翻譯與原文不同」的項目，只用 name（不存 intro 與 links）。
 import { AppError, E } from './errors.js'
 
 export const DAY_MS = 24 * 60 * 60 * 1000
 export const RETRY_AFTER_FAIL_MS = 60 * 60 * 1000
 const MAX_NAME_CHARS = 100
+// 解析結果少於這個筆數＝資料不完整（例如名稱全空的檔案），丟 TAGDB_FAILED、保留舊資料
+export const MIN_TAGDB_ROWS = 1000
 
 // nhentai 的 tag 沒有 namespace：依序找這幾個，先找到的為準（mixed 的翻譯是中性說法，所以排第一）
 export const TAG_NAMESPACES = Object.freeze(['mixed', 'female', 'male', 'other', 'location'])
@@ -12,6 +17,11 @@ export const TAG_NAMESPACES = Object.freeze(['mixed', 'female', 'male', 'other',
 /** 40 位十六進位（commit sha） */
 export function isSha(s) {
   return typeof s === 'string' && /^[0-9a-f]{40}$/i.test(s.trim())
+}
+
+/** 64 位十六進位（sources.json 的 sha256） */
+export function isSha256(s) {
+  return typeof s === 'string' && /^[0-9a-f]{64}$/i.test(s.trim())
 }
 
 /** 含平假名或片假名（U+3040–U+30FF）＝視為日文名稱，不做簡轉繁 */
@@ -25,7 +35,8 @@ function entriesOf(ns) {
 }
 
 /**
- * 解析 db.text.json，輸出 { sha, rows: [{ type, name, zh }] }。
+ * 解析 db.text.json（中文）或 ja.json（日文，結構相同），輸出 { sha, rows: [{ type, name, label }] }。
+ * ja.json 沒有 head，sha 為空字串。
  * @throws {AppError} TAGDB_FAILED：結構不對，或完全找不到 artist／group／任何 tag namespace
  */
 export function parseTagDb(json) {
@@ -45,13 +56,13 @@ export function parseTagDb(json) {
   const seen = new Set()
   const push = (type, rawKey, entry) => {
     const name = String(rawKey ?? '').trim().toLowerCase()
-    const zh = typeof entry?.name === 'string' ? entry.name.trim() : ''
-    if (!name || !zh || zh.length > MAX_NAME_CHARS) return
-    if (zh.toLowerCase() === name) return // 翻譯和原文相同：不存
+    const label = typeof entry?.name === 'string' ? entry.name.trim() : ''
+    if (!name || !label || label.length > MAX_NAME_CHARS) return
+    if (label.toLowerCase() === name) return // 翻譯和原文相同：不存
     const key = `${type}\u0000${name}`
     if (seen.has(key)) return // 先找到的 namespace 為準
     seen.add(key)
-    rows.push({ type, name, zh })
+    rows.push({ type, name, label })
   }
   for (const nsName of TAG_NAMESPACES) for (const [k, v] of entriesOf(byNs.get(nsName))) push('tag', k, v)
   for (const [k, v] of entriesOf(byNs.get('artist'))) push('artist', k, v)
@@ -61,15 +72,15 @@ export function parseTagDb(json) {
 
 /**
  * 產生要寫進資料庫的列：zh_cn 原樣、zh_tw 用 cnToTw 轉換；含日文假名的名稱不轉換（zh_tw = zh_cn）。
- * @param {{type:string,name:string,zh:string}[]} rows
+ * @param {{type:string,name:string,label:string}[]} rows
  * @param {(s:string)=>string} cnToTw
  */
 export function toTranslationRows(rows, cnToTw) {
   return rows.map((r) => ({
     type: r.type,
     name: r.name,
-    zh_cn: r.zh,
-    zh_tw: hasKana(r.zh) ? r.zh : String(cnToTw(r.zh) || r.zh),
+    zh_cn: r.label,
+    zh_tw: hasKana(r.label) ? r.label : String(cnToTw(r.label) || r.label),
   }))
 }
 
@@ -103,7 +114,69 @@ export function isUpdateDue({ enabled, now, checkedAt = 0, lastFailedAt = 0, has
   return !checkedAt || now - checkedAt >= DAY_MS
 }
 
-/** 介面語言對應的翻譯欄位名稱（寫死的對照表，不可把使用者輸入拼進 SQL）；其他語言回傳 null */
-export function translationColumn(lang) {
-  return { 'zh-TW': 'zh_tw', 'zh-CN': 'zh_cn' }[lang] ?? null
+/**
+ * 日文翻譯的整批取代語句：先 DELETE 全部，再每 chunk 筆組成一句多列 INSERT（ja 放 parseTagDb 的 label）。
+ * 每句參數數 = 3 × chunk，必須 ≤ 999，預設 300 筆 = 900。
+ * @param {{type:string,name:string,label:string}[]} rows
+ */
+export function jaTranslationStatements(rows, chunk = 300) {
+  if (chunk * 3 > 999) throw new RangeError('chunk too large for SQLite variable limit')
+  const out = [{ statement: 'DELETE FROM tag_translations_ja', values: [] }]
+  for (let i = 0; i < rows.length; i += chunk) {
+    const part = rows.slice(i, i + chunk)
+    const values = []
+    for (const r of part) values.push(r.type, r.name, r.label)
+    out.push({
+      statement: `INSERT OR REPLACE INTO tag_translations_ja(type, name, ja) VALUES ${part.map(() => '(?,?,?)').join(',')}`,
+      values,
+    })
+  }
+  return out
+}
+
+/**
+ * sources.json（EhPanda Tag Database）裡日文資料的版本＝datasets.ja.sha256（小寫）。
+ * 任何不符合預期的情況回傳 ''（當作不知道），不丟錯。
+ */
+export function parseSourcesVersion(json) {
+  const ja = json && typeof json === 'object' ? json.datasets?.ja : null
+  if (!ja || typeof ja !== 'object' || ja.file !== 'ja.json') return ''
+  return isSha256(ja.sha256) ? ja.sha256.trim().toLowerCase() : ''
+}
+
+const own = (obj, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(obj, k)
+const DATASETS = Object.freeze({ 'zh-TW': 'zh', 'zh-CN': 'zh', ja: 'ja' })
+
+/** 介面語言 → 要用哪一份翻譯資料：'zh'／'ja'／null（英文等沒有翻譯） */
+export function tagDataset(lang) {
+  return own(DATASETS, lang) ? DATASETS[lang] : null
+}
+
+const TAGTR_KEYS = Object.freeze({
+  zh: Object.freeze({ sha: 'tagtr_sha', count: 'tagtr_count', updatedAt: 'tagtr_updated_at', checkedAt: 'tagtr_checked_at' }),
+  ja: Object.freeze({
+    sha: 'tagtr_ja_sha',
+    count: 'tagtr_ja_count',
+    updatedAt: 'tagtr_ja_updated_at',
+    checkedAt: 'tagtr_ja_checked_at',
+  }),
+})
+
+/** 某份資料的四個設定鍵名稱 { sha, count, updatedAt, checkedAt }；其他值回傳 null */
+export function tagtrKeys(dataset) {
+  return own(TAGTR_KEYS, dataset) ? TAGTR_KEYS[dataset] : null
+}
+
+const TRANSLATION_SOURCES = Object.freeze({
+  'zh-TW': Object.freeze({ table: 'tag_translations', column: 'zh_tw' }),
+  'zh-CN': Object.freeze({ table: 'tag_translations', column: 'zh_cn' }),
+  ja: Object.freeze({ table: 'tag_translations_ja', column: 'ja' }),
+})
+
+/**
+ * 介面語言對應的翻譯資料表與欄位（寫死的對照表，不可把使用者輸入拼進 SQL）；其他語言回傳 null。
+ * @returns {{table:string, column:string}|null}
+ */
+export function translationSource(lang) {
+  return own(TRANSLATION_SOURCES, lang) ? TRANSLATION_SOURCES[lang] : null
 }
