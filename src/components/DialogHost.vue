@@ -47,7 +47,11 @@
           <h3 class="sheet-title">{{ d.title }}</h3>
           <!-- 多選選單的「篩選方式」（排除／包含任一／全部符合）：緊接在灰色標題旁 -->
           <template v-if="d.multi?.mode">
-            <ModePicker :model-value="d.multi.mode.value" @update:model-value="setMode(d, $event)" />
+            <ModePicker
+              :model-value="d.multi.mode.value"
+              :default-mode="d.multi.mode.default"
+              @update:model-value="setMode(d, $event)"
+            />
             <span class="spacer" />
           </template>
           <button

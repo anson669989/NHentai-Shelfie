@@ -409,7 +409,7 @@ async function folderPicker(scroll) {
           await setFolderFilter(['all'])
           return folderFilter.value.slice()
         },
-        mode: { value: folderMode.value, set: setFolderMode },
+        mode: { value: folderMode.value, default: DEFAULT_FOLDER_MODE, set: setFolderMode },
       },
     },
   )

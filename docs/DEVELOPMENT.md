@@ -92,10 +92,10 @@ App 啟動／回到前景／收到事件 → library.drainQuickShares（JS）
 - 標籤存在 `tags(id, type, name)`＋`book_tags(gallery_id, tag_id)`，存全部 7 種類型（tag、artist、group、parody、character、language、category），介面只顯示 tag／artist／group 且本數 > 0 的。解析在 `parse.js` 的 `parseSearchFields`（api-v1／api-v2 都支援，欄位缺少不崩潰）。
 - 新書：meta 工作者寫書名與 `book_raw` 的同一個交易裡一併寫 `title_en`、`tags`、`book_tags`。
 - 舊資料：遷移只建表；啟動後由 `library.backfillTags` 從 `book_raw` 本地分批（每批 100 本）回填，不上網，完成後記 `tags_backfilled = 1`。
-- 標籤選項清單只渲染前 200 筆（已勾選的排最上面，其他依本數多到少），其餘提示「繼續輸入以縮小範圍」。
+- 標籤選項清單沒有數量上限（已勾選的排最上面，其他依本數多到少）；為了不卡，`TagFilter` 先畫 200 筆，捲到接近底部再多畫 200 筆，打字換關鍵字時回到第一批。
 - 重開 App 後只保留資料夾篩選與它的篩選方式（設定鍵 `folder_filter`、`folder_filter_mode`），文字、標籤與標籤的篩選方式每次回到預設。「清除全部篩選」會把兩個篩選方式都還原成預設；清單／選單裡的「全部清除」只取消勾選。
 - 篩選方式不是預設且有勾選時，收合的輸入框與資料夾按鈕會標出來（例：「排除：已選 2 個」「排除：未讀」）。資料夾篩選方式為「排除」時，`currentFolder` 為 null（列出的書都不在那個資料夾，所以沒有「從此資料夾移除」），按鈕上也不顯示本數。
-- 選篩選方式的元件是 [`ModePicker.vue`](../src/components/ModePicker.vue)（小按鈕＋下拉選單，不用原生 `<select>`：標籤清單為了不收鍵盤會擋掉 mousedown，原生選單可能打不開），標籤清單與資料夾選單（`actionSheet` 的 `multi.mode`）共用。
+- 選篩選方式的元件是 [`ModePicker.vue`](../src/components/ModePicker.vue)（小按鈕＋下拉選單，不用原生 `<select>`：標籤清單為了不收鍵盤會擋掉 mousedown，原生選單可能打不開），標籤清單與資料夾選單（`actionSheet` 的 `multi.mode`）共用；選單裡預設的那一項後面標「（預設）」（`defaultMode`）。
 
 ## 標籤翻譯（中文＋日文）
 

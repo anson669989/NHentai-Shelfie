@@ -20,7 +20,9 @@
       >
         <span class="mode-opt-mark" aria-hidden="true">{{ m === modelValue ? '✓' : '' }}</span>
         <span class="mode-opt-text">
-          <span class="mode-opt-name">{{ t('filter.mode.' + m) }}</span>
+          <span class="mode-opt-name"
+            >{{ t('filter.mode.' + m) }}<span v-if="m === defaultMode" class="mode-opt-default">{{ t('filter.modeDefault') }}</span></span
+          >
           <span class="mode-opt-hint">{{ t('filter.modeHint.' + m) }}</span>
         </span>
       </button>
@@ -36,6 +38,7 @@ import { FILTER_MODES } from '../services/filter.js'
 
 defineProps({
   modelValue: { type: String, required: true }, // 'exclude' | 'any' | 'all'
+  defaultMode: { type: String, default: '' }, // 預設的篩選方式：選單裡那一項後面標「（預設）」（標籤＝all、資料夾＝any）
 })
 const emit = defineEmits(['update:modelValue'])
 

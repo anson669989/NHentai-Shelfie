@@ -452,6 +452,7 @@ input[type='search']::-webkit-search-cancel-button { -webkit-appearance: none; d
 .mode-opt-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .mode-opt-name { font-size: 15px; }
 .mode-opt.on .mode-opt-name { color: var(--primary); font-weight: 600; }
+.mode-opt-default { margin-left: 4px; font-size: 12px; font-weight: 400; color: var(--muted); }
 .mode-opt-hint { font-size: 12px; line-height: 1.4; color: var(--muted); }
 
 /* ---------- 使用說明（每個主題一張卡片，點標題展開條列內容） ---------- */

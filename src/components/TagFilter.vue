@@ -32,15 +32,15 @@
     <div v-if="open" class="tag-panel" @mousedown.prevent>
       <div class="tag-panel-head">
         <span class="muted small tag-panel-count">{{ t('filter.tagsSelected', { n: modelValue.length }) }}</span>
-        <ModePicker :model-value="mode" @update:model-value="emit('update:mode', $event)" />
+        <ModePicker :model-value="mode" :default-mode="DEFAULT_TAG_MODE" @update:model-value="emit('update:mode', $event)" />
         <span class="spacer" />
         <button class="btn text sheet-clear" :disabled="!modelValue.length" @click="clearSelected">
           {{ t('filter.clear') }}
         </button>
         <button class="btn text sheet-clear" @click="hide">{{ t('filter.done') }}</button>
       </div>
-      <div class="tag-list">
-        <button v-for="o in list.items" :key="o.id" class="tag-row" @click="toggle(o.id)">
+      <div ref="listEl" class="tag-list" @scroll.passive="onListScroll">
+        <button v-for="o in visible" :key="o.id" class="tag-row" @click="toggle(o.id)">
           <span class="sheet-box" :class="{ on: selectedSet.has(o.id) }" aria-hidden="true" />
           <span class="tag-type" :class="'tt-' + o.type">{{ t('tagType.' + o.type) }}</span>
           <span class="tag-name"
@@ -52,14 +52,13 @@
         <p v-if="!list.items.length" class="tag-hint">
           {{ options.length ? t('filter.noOption') : t('filter.noTags') }}
         </p>
-        <p v-if="list.more" class="tag-hint">{{ t('filter.more', { n: list.more }) }}</p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { t } from '../i18n.js'
 import { pushBackHandler } from '../ui.js'
 import { filterTagOptions, DEFAULT_TAG_MODE } from '../services/filter.js'
@@ -73,7 +72,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue', 'update:mode'])
 
-const LIMIT = 200 // 只渲染前 200 筆，其餘提示「繼續輸入以縮小範圍」
+const PAGE = 200 // 清單沒有數量上限；為了不卡，先畫 200 筆，捲到接近底部再多畫 200 筆
 const root = ref(null)
 const input = ref(null)
 const open = ref(false)
@@ -81,7 +80,20 @@ const query = ref('')
 let removeBack = null
 
 const selectedSet = computed(() => new Set(props.modelValue))
-const list = computed(() => filterTagOptions(props.options, query.value, props.modelValue, LIMIT))
+const listEl = ref(null)
+const shown = ref(PAGE)
+const list = computed(() => filterTagOptions(props.options, query.value, props.modelValue, Infinity))
+const visible = computed(() => list.value.items.slice(0, shown.value))
+/** 捲到離底部不到 300 px 就再多畫一批，直到全部畫完 */
+function onListScroll(e) {
+  const el = e.target
+  if (shown.value < list.value.items.length && el.scrollHeight - el.scrollTop - el.clientHeight < 300) shown.value += PAGE
+}
+// 打字換了關鍵字：回到第一批並捲回最上面
+watch(query, () => {
+  shown.value = PAGE
+  if (listEl.value) listEl.value.scrollTop = 0
+})
 /** 收合時輸入框顯示的「已選 N 個」；篩選方式不是預設（全部符合）時在前面標出來，例如「排除：已選 2 個」 */
 const selectedText = computed(() => {
   const text = t('filter.tagsSelected', { n: props.modelValue.length })
@@ -90,6 +102,7 @@ const selectedText = computed(() => {
 
 function show() {
   if (open.value) return
+  shown.value = PAGE
   open.value = true
   removeBack = pushBackHandler(hide) // 返回鍵先收合清單
   document.addEventListener('pointerdown', onOutside, true)
