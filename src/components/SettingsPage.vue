@@ -1,6 +1,18 @@
 <template>
   <section class="page settings-page">
     <div class="settings-inner">
+      <!-- 使用說明：放在最上方，點了開啟條列式的說明 -->
+      <div class="card help-card">
+        <button class="row help-entry" type="button" @click="openHelp">
+          <span class="help-entry-icon" aria-hidden="true">📖</span>
+          <span class="row-text">
+            <span>{{ t('settings.help') }}</span>
+            <span class="muted small">{{ t('settings.helpHint') }}</span>
+          </span>
+          <span class="help-entry-caret muted" aria-hidden="true">›</span>
+        </button>
+      </div>
+
       <!-- 外觀 -->
       <h2>{{ t('settings.appearance') }}</h2>
       <div class="card">
@@ -130,6 +142,22 @@
           </div>
           <label class="switch">
             <input type="checkbox" :checked="on('tag_translate')" @change="flipTagTranslate($event)" />
+            <span class="switch-track" />
+          </label>
+        </div>
+        <!-- 附註原文：翻譯名稱旁以灰色小字顯示原文；沒開「顯示翻譯」時沒有作用，所以變淡、不能切換 -->
+        <div class="row" :class="{ off: !on('tag_translate') }">
+          <div class="row-text">
+            <span>{{ t('settings.tagShowOriginal') }}</span>
+            <span class="muted small">{{ t('settings.tagShowOriginalHint') }}</span>
+          </div>
+          <label class="switch">
+            <input
+              type="checkbox"
+              :checked="on('tag_show_original')"
+              :disabled="!on('tag_translate')"
+              @change="flip('tag_show_original', $event)"
+            />
             <span class="switch-track" />
           </label>
         </div>
@@ -295,11 +323,6 @@
       <!-- 關於 -->
       <h2>{{ t('settings.about') }}</h2>
       <div class="card">
-        <div class="row">
-          <button class="btn text" @click="alertDialog(t('help'), { title: t('settings.help') })">
-            {{ t('settings.help') }}
-          </button>
-        </div>
         <div class="row version-row" @click="onVersionTap">
           <span>{{ t('settings.version') }}</span>
           <span class="muted">{{ version }}</span>
@@ -350,8 +373,9 @@ import { liveFolderSheet } from './bookActions.js'
 import { validateEndpointTemplate, RECENT_LIMITS, normalizeRecentLimit } from '../services/parse.js'
 import { AppError, E, toAppError } from '../services/errors.js'
 import { t, errText, LANGUAGES, currentLang } from '../i18n.js'
-import { alertDialog, confirmDialog, toast, formatBytes } from '../ui.js'
+import { alertDialog, confirmDialog, helpDialog, toast, formatBytes } from '../ui.js'
 import { openFolderManager } from './folderManager.js'
+import { parseHelp } from './helpText.js'
 
 const props = defineProps({ active: Boolean })
 /** 媽媽模式「詳細設定」是否展開（不記住，每次進設定頁都收合） */
@@ -372,6 +396,8 @@ const devMode = computed(() => settings.dev_mode === '1')
 /** 開關型設定：'1' / '0' */
 const on = (key) => settings[key] === '1'
 const flip = (key, ev) => setSetting(key, ev.target.checked ? '1' : '0')
+/** 使用說明：locales 的 help（純文字）解析成主題＋條列後顯示 */
+const openHelp = () => helpDialog(t('settings.help'), parseHelp(t('help')))
 
 const lastExportText = computed(() => {
   const s = Number(settings.last_export_at)

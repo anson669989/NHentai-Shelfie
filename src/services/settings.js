@@ -35,12 +35,14 @@ export const DEFAULTS = Object.freeze({
   mama_hide_title: '0', // 隱藏書名
   mama_hide_note: '0', // 隱藏備註
   folder_filter: '["all"]', // 收藏頁資料夾篩選（多選）：["all"] 或 "uncat"／資料夾 id 的陣列；文字與標籤篩選不保留
+  folder_filter_mode: 'any', // 資料夾篩選方式：exclude（排除）| any（包含任一）| all（全部符合）；標籤的篩選方式不保留
   tags_backfilled: '0', // 1 = 舊資料的標籤已從 book_raw 回填完成（schema v3）
   sys_seeded: '0', // 1 = 已做過一次性預設：把「未讀」加進 last_folders（schema v4）
   share_mode: 'open', // 從瀏覽器分享時：open（開 App 選資料夾）| quick（不開 App 直接收藏）
   share_auto_folders: '', // 直接收藏時自動加入的資料夾 id（JSON 陣列）；空字串＝還沒設定＝只有「未讀」，'[]'＝都不加
   bg_sync: '0', // 1 = 背景下載（前景服務＋通知）；不列入 CSV 備份（通知權限是每台手機各自的）
   tag_translate: '0', // 1 = 標籤篩選顯示翻譯（中文／日文，依介面語言；中文、日文共用這一個開關）
+  tag_show_original: '0', // 1 = 標籤篩選的翻譯名稱旁附註原文（只在顯示翻譯時有作用）
   tagtr_sha: '', // 中文資料：目前翻譯資料的版本（EhTagTranslation 的 commit sha）
   tagtr_count: '0', // 中文資料：翻譯資料筆數（設定頁顯示用）
   tagtr_updated_at: '0', // 中文資料：翻譯資料上次寫入的時間（毫秒）

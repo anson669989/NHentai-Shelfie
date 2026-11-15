@@ -21,14 +21,16 @@ Capacitor + Vue 3 的 Android App：輸入 gallery ID，背景抓書名與封面
 
 - `src/components/*.vue`：介面層，只呼叫服務層，不直接碰 DB、檔案、網路
 - `src/components/bookActions.js`：「⋮」單本選單（含備註）與開網頁，資料夾頁與新增頁「最近加入」共用，不要各複製一份；`viewOptions.js`（純函式）算顯示備註／媽媽模式
-- `src/components/TagFilter.vue`：收藏頁標籤／作者／社團篩選（可打字＋勾選清單、右上角「全部清除」，顯示 `label || name`＝有翻譯就顯示翻譯）；資料夾篩選用 `actionSheet` 的 `multi` 模式（勾選不關選單、標題列右邊「全部清除」）
+- `src/components/TagFilter.vue`：收藏頁標籤／作者／社團篩選（可打字＋勾選清單、右上角「全部清除」，顯示 `label || name`＝有翻譯就顯示翻譯；設定 `tag_show_original` 開啟時翻譯旁以灰色小字附註原文）；資料夾篩選用 `actionSheet` 的 `multi` 模式（勾選不關選單、標題列右邊「全部清除」）
+- `src/components/ModePicker.vue`：「篩選方式」小按鈕＋下拉選單（排除／包含任一／全部符合），標籤清單（`TagFilter`）與資料夾篩選選單（`actionSheet` 的 `multi.mode`）共用，不要各寫一份
+- `src/components/helpText.js`（純函式，有單元測試）：把 `locales.js` 的 `help`（純文字：`# 主題`、`- 條列`）解析成主題＋條列，由 `ui.js` 的 `helpDialog` 顯示（設定頁最上方的「使用說明」）；改說明內容只改 `locales.js` 四種語言，主題數與每個主題的條數要一致（`tests/help-text.test.js` 會檢查）
 - `src/components/folderRows.js`（純函式）：資料夾顯示名稱 `folderLabel`、書的資料夾文字 `bookFolderLabels`、所有資料夾清單的列 `buildFolderRows`（含系統資料夾、分隔線、拖曳／⋯）；**所有列出資料夾的地方都用它**
 - `src/components/folderManager.js`：「管理資料夾」畫面（`openFolderManager`）與資料夾／分隔線的改名、刪除選單（`openFolderItemMenu`），設定頁與收藏頁資料夾篩選共用，不要各寫一份
 - `src/services/library.js`：服務層入口，唯一碰 SQLite 與檔案的地方；背景佇列（meta／cover 兩個工作者）、快速分享收件匣（`drainQuickShares`／`pushQuickShareConfig`）、標籤翻譯更新（`updateTagTranslations`）、背景下載服務的啟停（`syncBgService`／`setAppActive`／`setBgSyncEnabled`／`nudgeQueue`）也在這裡。服務層不 import i18n：語言與提示文字由介面傳入（`setTagLang`、`setShareLabels`、`setBgSyncLabels`）
 - `src/services/nhSource.js`：**唯一**對 nhentai 發請求與解析的地方；站方改版只改這裡；也是唯一 import `nh-webfetch` 的地方（含接收分享的 `takeSharedText`／`onShareReceived`、快速分享的 `setQuickShareConfig`／`peekQuickShares`／`ackQuickShares`／`onQuickShareReceived`、鍵盤高度 `onKeyboardOverlap`）。使用 **API v2**（`/api/v2/galleries/{id}`、`/api/v2/cdn`，規格摘要見 `docs/tasks/archive/004-api-v2.md` 第 5 節）；舊 `/api/gallery/{id}` 已停用
 - `src/services/tagDbSource.js`：**唯一**對 GitHub 發請求的地方（標籤翻譯資料下載，中文 `'zh'`／日文 `'ja'` 兩份），不經 nhSource 的隊伍
 - `plugins/nh-webfetch/`：本地 Capacitor 外掛（Java），獨立隱藏 WebView 過 Cloudflare 後抓 API、驗證畫面、清 cookie；**nh-webfetch 也負責接收分享**：分享入口是外掛 manifest 宣告的無畫面 `ShareReceiverActivity`（ACTION_SEND，依設定轉給 MainActivity 或直接收藏），快速分享的設定與收件匣存在 `QuickShareStore`（SharedPreferences `nh_quick_share`）；另有 `openExternal`（以系統瀏覽器開網頁，Java 端再檢查 https＋nhentai 網域；JS 由 nhSource 的 `openInBrowser` 呼叫，依設定 `open_mode` 選外部瀏覽器或 Custom Tab）與鍵盤高度事件 `keyboardOverlap`（給 `src/viewport.js`）；**背景下載**：前景服務 `SyncService`（`dataSync`＋進度通知＋有逾時的 WakeLock，通知不放書名／封面／ID、鎖定畫面不顯示）、通知權限（`getNotificationPermission`／`requestNotificationPermission`）、`startBgSync`／`updateBgSync`／`stopBgSync`／`clearBgSyncNotice`、事件 `bgSyncStopped`（`user`／`timeout`／`failed`），以及原生計時 `delay`（App 在背景時節流等待用，由 nhSource 的 `sleep` 依 `pickSleep` 選用）；`cap sync` 自動納入，不需改 android/
-- `src/services/parse.js`、`csv.js`、`errors.js`、`settingsMigration.js`、`addPlan.js`、`filter.js`、`folderOrder.js`、`quickShare.js`、`tagTranslation.js`、`bgSync.js`：純函式，無 I/O，必須有單元測試（`bgSync.js`＝背景下載服務的啟停判斷 `planBgSync`、預估分鐘數 `estimateSyncMinutes`、通知文字 `fillCount`、計時方式 `pickSleep`；`filter.js`＝搜尋／篩選：資料夾多選規則、標籤選項排序、參數化 WHERE 組裝；`folderOrder.js`＝資料夾與分隔線的合併與重排；`quickShare.js`＝快速分享的自動加入資料夾與收件匣處理；`tagTranslation.js`＝翻譯資料解析、版本判斷、批次 INSERT 語句、語言 → 資料表對照）
+- `src/services/parse.js`、`csv.js`、`errors.js`、`settingsMigration.js`、`addPlan.js`、`filter.js`、`folderOrder.js`、`quickShare.js`、`tagTranslation.js`、`bgSync.js`：純函式，無 I/O，必須有單元測試（`bgSync.js`＝背景下載服務的啟停判斷 `planBgSync`、預估分鐘數 `estimateSyncMinutes`、通知文字 `fillCount`、計時方式 `pickSleep`；`filter.js`＝搜尋／篩選：資料夾多選規則、篩選方式 `FILTER_MODES`、標籤選項排序、參數化 WHERE 組裝；`folderOrder.js`＝資料夾與分隔線的合併與重排；`quickShare.js`＝快速分享的自動加入資料夾與收件匣處理；`tagTranslation.js`＝翻譯資料解析、版本判斷、批次 INSERT 語句、語言 → 資料表對照）
 - `src/services/zhConvert.js`：簡 → 繁（opencc-js `cn → twp`），**動態 import**，只在更新中文翻譯時載入
 - `src/services/db.js`：連線與 schema 遷移
 - `src/locales.js`：所有介面字串（繁中 zh-TW / 简中 zh-CN / English / 日本語）四份同步，純資料（`tests/locales.test.js` 檢查四語鍵一致）；`src/i18n.js` 只放 `t()`、`errText()` 與語言偵測
@@ -91,6 +93,7 @@ Capacitor + Vue 3 的 Android App：輸入 gallery ID，背景抓書名與封面
 
 - `docs/tasks/2026-11-update.md`（v0.4.0）：系統資料夾（未讀、典藏）、管理資料夾與分隔線、⋮ 單本選單改版（重新載入、即時儲存分類）、鍵盤不遮住備註、快速分享（直接收藏）、標籤翻譯（中文＋日文）、CSV v2、schema v4／v5。清單在該文件第 5 節；手機測完沒問題才推 `v0.4.0` 標籤發佈
 - `docs/tasks/2026-11-background-download.md`（併入 v0.4.0）：背景下載開關與通知權限、前景服務與通知、背景計時（⚠ 背景時網頁計時器是否被放慢）、直接收藏在背景時不連網、匯入提醒。清單在該文件第 5 節
+- 2026-11-15 追加（沒有任務文件，併入 v0.4.0）：使用說明移到設定頁最上方並改成條列式（點主題展開）、標籤／資料夾的「篩選方式」（排除／包含任一／全部符合）、設定「附註原文」（`tag_show_original`）。只用電腦瀏覽器看過 360 px 寬的排版，尚未在手機上測
 - `docs/tasks/archive/007-search-notes-privacy.md`、`006-ui-batch.md`：已隨 v0.3.0 發佈
 - `docs/tasks/archive/005-batch.md`：封面下載修正（先建資料夾）、白話錯誤訊息、清除封面快取、新圖示
 - `docs/tasks/archive/002-folder-dropdown.md`：資料夾下拉選單已實作，驗收清單尚未勾選
@@ -107,7 +110,7 @@ Capacitor + Vue 3 的 Android App：輸入 gallery ID，背景抓書名與封面
 - 已做：M1 路線 A MVP、M2 設定頁、M3 CSV、API v2、Cloudflare 備援 2（WebView 驗證抓取，現在只在原生被擋時才用）、隱藏開發者模式（關於 → 版本 連點 7 次）
 - 已做（006）：先存後查＋兩條節流隊伍、多選、⋮ 選單、分享加入、简体中文；schema v2＝`books.queue_seq` 與新的 `fetch_status` 值（舊 `pending` 自動轉換）
 - 已做（007）：開啟網頁方式（`open_mode`）、⋮ 選單備註、顯示備註、媽媽模式、最近加入改版、資料夾拖曳排序、收藏頁搜尋與篩選；schema v3＝`tags`／`book_tags`／`books.title_en`
-- 搜尋與篩選：`標籤（且）` 且 `資料夾（或）` 且 `文字`（英／日標題、備註、ID）；只保留資料夾篩選（設定 `folder_filter`），文字與標籤每次開 App 清空。新書的標籤在 meta 工作者寫書名的同一個交易寫入；舊資料由 `library.backfillTags` 從 book_raw 本地分批回填（`tags_backfilled`）
+- 搜尋與篩選：`標籤` 且 `資料夾` 且 `文字`（英／日標題、備註、ID）；標籤與資料夾各有「篩選方式」（`exclude` 排除／`any` 包含任一／`all` 全部符合；標籤預設 `all`、資料夾預設 `any`）。只保留資料夾篩選與它的篩選方式（設定 `folder_filter`、`folder_filter_mode`），文字、標籤與標籤的篩選方式每次開 App 回到預設；「清除全部篩選」會把兩個篩選方式都還原成預設。資料夾篩選方式為「排除」時沒有「目前資料夾」（不顯示「從此資料夾移除」）。新書的標籤在 meta 工作者寫書名的同一個交易寫入；舊資料由 `library.backfillTags` 從 book_raw 本地分批回填（`tags_backfilled`）
 - 已取消：M4 詳情頁與標籤顯示（點封面一律開網頁，備註在 ⋮ 選單編輯；標籤只做搜尋與篩選）
 - 未做：Cloudflare 備援 3（手動指定封面）、FLAG_SECURE、App 開啟鎖
 - 背景佇列預設只在前景執行；背景下載（選用，前景服務＋通知）見規則 17 與 `docs/DEVELOPMENT.md`「背景下載」一節

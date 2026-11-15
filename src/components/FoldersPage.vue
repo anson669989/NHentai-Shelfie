@@ -11,7 +11,13 @@
     <header v-else class="folder-bar filter-bar">
       <!-- 第一列：標籤／作者／社團（可打字）｜排序 -->
       <div class="filter-row">
-        <TagFilter ref="tagFilter" v-model="tagIds" :options="tagOptions" />
+        <TagFilter
+          ref="tagFilter"
+          v-model="tagIds"
+          v-model:mode="tagMode"
+          :options="tagOptions"
+          :show-original="settings.tag_show_original === '1'"
+        />
         <select class="sort-select" :value="sortMode" @change="changeSort($event.target.value)">
           <option v-for="m in SORT_MODES" :key="m" :value="m">{{ t('sort.' + m) }}</option>
         </select>
@@ -111,6 +117,10 @@ import {
   sortKeyOf,
   hasActiveFilter,
   normalizeSearchText,
+  isAllFolders,
+  normalizeFilterMode,
+  DEFAULT_TAG_MODE,
+  DEFAULT_FOLDER_MODE,
 } from '../services/filter.js'
 import { t, errText, currentLang } from '../i18n.js'
 import { actionSheet, confirmDialog, toast, pushBackHandler } from '../ui.js'
@@ -123,9 +133,13 @@ const props = defineProps({ active: Boolean })
 
 const folders = ref([])
 const books = ref([])
-// 篩選：資料夾（多選「或」，記在設定）、標籤（多選「且」）、文字；文字與標籤每次開 App 清空
+// 篩選：資料夾（多選，記在設定）、標籤（多選）、文字；文字與標籤每次開 App 清空。
+// 多選的邏輯由各自的「篩選方式」決定（排除／包含任一／全部符合）：資料夾預設「包含任一」、和勾選一起記在設定；
+// 標籤預設「全部符合」、和勾選一樣每次開 App 回到預設
 const folderFilter = ref(normalizeFolderFilter(settings.folder_filter))
+const folderMode = ref(normalizeFilterMode(settings.folder_filter_mode, DEFAULT_FOLDER_MODE))
 const tagIds = ref([])
+const tagMode = ref(DEFAULT_TAG_MODE)
 const tagOptions = ref([])
 const textInput = ref('')
 const searchText = ref('') // 停止輸入約 300 ms 後才更新
@@ -144,10 +158,11 @@ const countOf = (key) =>
   key === 'all' ? counts.value.all : key === 'uncat' ? counts.value.uncat : counts.value.byFolder[key] || 0
 /**
  * 只篩選一個資料夾時才有（⋮ 與多選批次的「從此資料夾移除」）；含系統資料夾「未讀」「典藏」。
- * 「全部」「未分類」或多選為 null
+ * 「全部」「未分類」、多選，或篩選方式是「排除」（列出的書都不在這個資料夾裡）為 null
  */
 const currentFolder = computed(() => {
   const f = folderFilter.value
+  if (folderMode.value === 'exclude') return null
   return f.length === 1 && typeof f[0] === 'number' ? folders.value.find((x) => x.id === f[0]) || null : null
 })
 const nameOf = (key) =>
@@ -156,11 +171,26 @@ const nameOf = (key) =>
     : key === 'uncat'
       ? t('folder.uncat')
       : folderLabel(folders.value.find((f) => f.id === key), t)
-const pickerLabel = computed(() =>
-  folderFilter.value.length === 1 ? nameOf(folderFilter.value[0]) : t('filter.foldersN', { n: folderFilter.value.length }),
+/** 資料夾篩選方式不是預設（包含任一）且有勾選時，按鈕文字前面標出來，例如「排除：未讀」 */
+const folderModeShown = computed(() => !isAllFolders(folderFilter.value) && folderMode.value !== DEFAULT_FOLDER_MODE)
+const pickerLabel = computed(() => {
+  const text =
+    folderFilter.value.length === 1 ? nameOf(folderFilter.value[0]) : t('filter.foldersN', { n: folderFilter.value.length })
+  return folderModeShown.value ? t('filter.modePrefix', { mode: t('filter.mode.' + folderMode.value), text }) : text
+})
+/** 按鈕上的本數：只選一個才顯示；「排除」時那個數字不是列表的本數，所以不顯示 */
+const folderCount = computed(() =>
+  folderFilter.value.length === 1 && !(folderModeShown.value && folderMode.value === 'exclude')
+    ? countOf(folderFilter.value[0])
+    : null,
 )
-const folderCount = computed(() => (folderFilter.value.length === 1 ? countOf(folderFilter.value[0]) : null))
-const filter = computed(() => ({ folders: folderFilter.value, tagIds: tagIds.value, text: searchText.value }))
+const filter = computed(() => ({
+  folders: folderFilter.value,
+  folderMode: folderMode.value,
+  tagIds: tagIds.value,
+  tagMode: tagMode.value,
+  text: searchText.value,
+}))
 const filtering = computed(() => hasActiveFilter(filter.value))
 /** 顯示備註與媽媽模式（收藏頁） */
 const view = computed(() => viewOptions(settings, 'library'))
@@ -202,6 +232,9 @@ async function applyFilter() {
   }
 }
 watch(tagIds, applyFilter)
+watch(tagMode, () => {
+  if (tagIds.value.length) applyFilter() // 沒勾標籤時換篩選方式不影響結果
+})
 watch(searchText, applyFilter)
 let textTimer = null
 watch(textInput, (v) => {
@@ -221,11 +254,27 @@ async function setFolderFilter(value, apply = true) {
   if (apply) await applyFilter()
 }
 
-function clearAllFilters() {
+/** 換資料夾的篩選方式（記在設定）；回傳實際套用的值給選單顯示 */
+async function setFolderMode(mode) {
+  folderMode.value = normalizeFilterMode(mode, DEFAULT_FOLDER_MODE)
+  await setSetting('folder_filter_mode', folderMode.value)
+  if (!isAllFolders(folderFilter.value)) await applyFilter() // 「全部」時換篩選方式不影響結果
+  return folderMode.value
+}
+
+/** 「清除全部篩選」：勾選、文字都清掉，兩個篩選方式也回到預設 */
+async function clearAllFilters() {
   tagFilter.value?.hide()
   tagIds.value = []
+  tagMode.value = DEFAULT_TAG_MODE
   clearText()
-  setFolderFilter(['all']).catch((e) => toast(errText(e)))
+  try {
+    folderMode.value = DEFAULT_FOLDER_MODE
+    await setSetting('folder_filter_mode', DEFAULT_FOLDER_MODE)
+    await setFolderFilter(['all'])
+  } catch (e) {
+    toast(errText(e))
+  }
 }
 
 watch(
@@ -318,7 +367,8 @@ async function batchDelete() {
   }
 }
 
-// ---- 資料夾篩選（多選「或」）：勾選即時套用、選單不關；右上角「全部清除」回到「全部」 ----
+// ---- 資料夾篩選（多選）：勾選即時套用、選單不關；標題旁的「篩選方式」可選排除／包含任一／全部符合；
+// 右上角「全部清除」回到「全部」（篩選方式不變） ----
 // 使用者資料夾與分隔線可在這裡直接拖曳排序（≡）、改名或刪除（⋯）；結果和「管理資料夾」同步
 function openPicker() {
   return folderPicker({ top: 0 })
@@ -359,6 +409,7 @@ async function folderPicker(scroll) {
           await setFolderFilter(['all'])
           return folderFilter.value.slice()
         },
+        mode: { value: folderMode.value, set: setFolderMode },
       },
     },
   )

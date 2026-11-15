@@ -62,7 +62,7 @@
 1. **Download and install**: open "Download the latest APK" above on your phone, download `nh-shelfie.apk` and tap it to install.
 2. **Add your first item**: in the Add tab, enter an ID (e.g. `228922` or `#228922`) and tap Add. Or tap Share on a browser page and choose NH Shelfie; set Settings → Sharing to "Save instantly" to save without leaving the browser.
 3. **Sort it**: pick folders before adding (your last choice is remembered). Later, tap "⋮" on a cover → Folders, or long-press covers to select several and sort them at once.
-4. **Find things**: on the Library tab, type a tag / artist / group in the first row and tick it; type a title, note or ID in the second row; the folder filter lets you tick several folders. "Clear all" at the top-right of each drop-down unticks everything in one tap.
+4. **Find things**: on the Library tab, type a tag / artist / group in the first row and tick it; type a title, note or ID in the second row; the folder filter lets you tick several folders. Both filters have a "Mode": Exclude, Any or All. "Clear all" at the top-right of each drop-down unticks everything in one tap.
 
 ## ❓ FAQ
 

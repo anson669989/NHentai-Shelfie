@@ -2,7 +2,7 @@
 import { reactive } from 'vue'
 
 export const ui = reactive({
-  dialogs: [], // { id, kind: 'confirm'|'prompt'|'sheet'|'alert'|'checklist', ...opts, resolve }
+  dialogs: [], // { id, kind: 'confirm'|'prompt'|'sheet'|'alert'|'checklist'|'help', ...opts, resolve }
   toast: null, // { text, id }
 })
 
@@ -52,6 +52,14 @@ export const confirmDialog = (message, { okText, danger = false } = {}) =>
  */
 export const alertDialog = (message, { title, diagnostics } = {}) => open('alert', { message, title, diagnostics })
 
+/**
+ * 使用說明：每個主題一列，點標題展開條列內容。內容由 components/helpText.js 的 parseHelp 解析而來（純文字）。
+ * @param {string} title
+ * @param {{intro?:string[], sections:{title:string, items:string[]}[], footer?:string[]}} content
+ */
+export const helpDialog = (title, { intro = [], sections = [], footer = [] } = {}) =>
+  open('help', { title, intro, sections, footer, opened: {} })
+
 /** @returns {Promise<string|null>} */
 export const promptDialog = (title, { value = '', placeholder = '', maxlength = 30, validate } = {}) =>
   open('prompt', { title, value, placeholder, maxlength, validate, error: '' })
@@ -63,12 +71,13 @@ export const promptDialog = (title, { value = '', placeholder = '', maxlength = 
  * `{ divider: true }` 為細分隔線；`{ separator: true, label }` 為使用者建立的分隔線（置中灰字、左右有線，
  *   不可點、不可勾選；搭配 more／drag 時左邊有 ≡、右邊有 ⋯，可和資料夾列一起拖曳）。
  * @param {{label?:string, value?:any, danger?:boolean, checked?:boolean, more?:boolean, drag?:boolean, divider?:boolean, separator?:boolean}[]} actions
- * @param {{tall?:boolean, lines?:string[], note?:{value:string, label?:string, placeholder?:string, save?:(v:string)=>any}, onReorder?:(values:any[])=>any, multi?:{selected:any[], toggle:(value:any)=>any[]|Promise<any[]>, clear?:()=>any[]|Promise<any[]>, clearLabel?:string}, headAction?:{icon:'refresh', label:string, value:any}}} [opts]
+ * @param {{tall?:boolean, lines?:string[], note?:{value:string, label?:string, placeholder?:string, save?:(v:string)=>any}, onReorder?:(values:any[])=>any, multi?:{selected:any[], toggle:(value:any)=>any[]|Promise<any[]>, clear?:()=>any[]|Promise<any[]>, clearLabel?:string, mode?:{value:string, set:(mode:string)=>string|Promise<string>}}, headAction?:{icon:'refresh', label:string, value:any}}} [opts]
  *   tall：最大高度 70vh、可捲動（長清單用）；lines：標題下方的純文字行（例如完整書名），可選取複製；
  *   note：單行備註輸入框（直接改 note.value；離開輸入框時呼叫 note.save；貼上的換行轉成空白）
  *   onReorder：拖曳放開後以新順序的 value 陣列呼叫；回傳的 Promise 失敗時畫面還原、顯示錯誤
  *   multi：多選模式。帶 check: true 的列顯示勾選框，點了呼叫 multi.toggle(value) 換成回傳的勾選結果、選單不關；
- *     有 multi.clear 時標題列右邊出現「全部清除」；最下方的按鈕變成「完成」
+ *     有 multi.clear 時標題列右邊出現「全部清除」；最下方的按鈕變成「完成」；
+ *     有 multi.mode 時標題旁出現「篩選方式」（排除／包含任一／全部符合），選了呼叫 mode.set(值) 並換成回傳的值
  *   headAction：標題列右側的灰色小圖示鈕（目前只有 refresh），點了關閉選單並回傳 headAction.value
  *   scroll：捲動位置記憶 `{ top: 0 }`（呼叫端建立一次）。選單捲動時寫入 top、開啟時捲回 top——
  *     「改名／新增後重開同一個選單」的迴圈傳同一個物件，就會停在原本的位置，不會跳回最上方

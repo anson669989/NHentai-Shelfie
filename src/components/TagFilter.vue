@@ -1,5 +1,6 @@
 <template>
-  <!-- 標籤／作者／社團篩選：點了仍可打字，下方展開可勾選的清單（多選邏輯「且」） -->
+  <!-- 標籤／作者／社團篩選：點了仍可打字，下方展開可勾選的清單；
+       多選的邏輯由「篩選方式」決定（排除／包含任一／全部符合，預設全部符合） -->
   <div ref="root" class="tag-filter" :class="{ open }">
     <div class="tag-input-wrap">
       <input
@@ -11,7 +12,7 @@
         enterkeyhint="search"
         autocomplete="off"
         :aria-label="t('filter.tagFilter')"
-        :placeholder="!open && modelValue.length ? t('filter.tagsSelected', { n: modelValue.length }) : t('filter.tagPlaceholder')"
+        :placeholder="!open && modelValue.length ? selectedText : t('filter.tagPlaceholder')"
         @focus="show"
         @click="show"
         @keydown.enter.prevent="$event.target.blur()"
@@ -30,7 +31,8 @@
 
     <div v-if="open" class="tag-panel" @mousedown.prevent>
       <div class="tag-panel-head">
-        <span class="muted small">{{ t('filter.tagsSelected', { n: modelValue.length }) }}</span>
+        <span class="muted small tag-panel-count">{{ t('filter.tagsSelected', { n: modelValue.length }) }}</span>
+        <ModePicker :model-value="mode" @update:model-value="emit('update:mode', $event)" />
         <span class="spacer" />
         <button class="btn text sheet-clear" :disabled="!modelValue.length" @click="clearSelected">
           {{ t('filter.clear') }}
@@ -41,7 +43,10 @@
         <button v-for="o in list.items" :key="o.id" class="tag-row" @click="toggle(o.id)">
           <span class="sheet-box" :class="{ on: selectedSet.has(o.id) }" aria-hidden="true" />
           <span class="tag-type" :class="'tt-' + o.type">{{ t('tagType.' + o.type) }}</span>
-          <span class="tag-name">{{ o.label || o.name }}</span>
+          <span class="tag-name"
+            >{{ o.label || o.name
+            }}<span v-if="showOriginal && o.label && o.label !== o.name" class="tag-orig">{{ o.name }}</span></span
+          >
           <span class="tag-count">{{ o.n }}</span>
         </button>
         <p v-if="!list.items.length" class="tag-hint">
@@ -57,13 +62,16 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { t } from '../i18n.js'
 import { pushBackHandler } from '../ui.js'
-import { filterTagOptions } from '../services/filter.js'
+import { filterTagOptions, DEFAULT_TAG_MODE } from '../services/filter.js'
+import ModePicker from './ModePicker.vue'
 
 const props = defineProps({
   options: { type: Array, default: () => [] }, // [{id, type, name, n}]
   modelValue: { type: Array, default: () => [] }, // 勾選的 tag id
+  mode: { type: String, default: DEFAULT_TAG_MODE }, // 篩選方式：'exclude' | 'any' | 'all'
+  showOriginal: { type: Boolean, default: false }, // 翻譯名稱旁附註原文（設定 tag_show_original）
 })
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'update:mode'])
 
 const LIMIT = 200 // 只渲染前 200 筆，其餘提示「繼續輸入以縮小範圍」
 const root = ref(null)
@@ -74,6 +82,11 @@ let removeBack = null
 
 const selectedSet = computed(() => new Set(props.modelValue))
 const list = computed(() => filterTagOptions(props.options, query.value, props.modelValue, LIMIT))
+/** 收合時輸入框顯示的「已選 N 個」；篩選方式不是預設（全部符合）時在前面標出來，例如「排除：已選 2 個」 */
+const selectedText = computed(() => {
+  const text = t('filter.tagsSelected', { n: props.modelValue.length })
+  return props.mode === DEFAULT_TAG_MODE ? text : t('filter.modePrefix', { mode: t('filter.mode.' + props.mode), text })
+})
 
 function show() {
   if (open.value) return

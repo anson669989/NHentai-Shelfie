@@ -10,6 +10,10 @@ import {
   hasActiveFilter,
   filterTagOptions,
   UNCAT_SQL,
+  FILTER_MODES,
+  normalizeFilterMode,
+  DEFAULT_TAG_MODE,
+  DEFAULT_FOLDER_MODE,
 } from '../src/services/filter.js'
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf8')
@@ -125,6 +129,53 @@ describe('buildFilterWhere', () => {
     expect(r.values).toEqual([3, 9, 1, '%x%', '%x%', '%x%', '%x%', '%x%'])
     expect(hasActiveFilter({ folders: [3], tagIds: [], text: '' })).toBe(true)
     expect(hasActiveFilter({ folders: ['all'], tagIds: [], text: '  ' })).toBe(false)
+  })
+  it('篩選方式整理：不是三個值之一就用預設', () => {
+    expect(FILTER_MODES).toEqual(['exclude', 'any', 'all'])
+    expect(normalizeFilterMode('exclude', 'any')).toBe('exclude')
+    expect(normalizeFilterMode('ALL', 'any')).toBe('any')
+    expect(normalizeFilterMode(undefined, DEFAULT_TAG_MODE)).toBe('all')
+    expect(normalizeFilterMode('', DEFAULT_FOLDER_MODE)).toBe('any')
+  })
+  it('沒指定篩選方式＝原本的行為（標籤全部符合、資料夾包含任一）', () => {
+    const f = { folders: ['uncat', 2, 5], tagIds: [7, 8], text: 'x' }
+    expect(buildFilterWhere(f)).toEqual(buildFilterWhere({ ...f, folderMode: 'any', tagMode: 'all' }))
+    expect(buildFilterWhere({ ...f, folderMode: 'weird', tagMode: null })).toEqual(buildFilterWhere(f))
+  })
+  it('標籤「包含任一」：有其中一個就算', () => {
+    const { where, values } = buildFilterWhere({ tagIds: [7, 8], tagMode: 'any' })
+    expect(where).toBe('EXISTS (SELECT 1 FROM book_tags bt WHERE bt.gallery_id = b.gallery_id AND bt.tag_id IN (?,?))')
+    expect(values).toEqual([7, 8])
+  })
+  it('標籤「排除」：一個都沒有', () => {
+    const { where, values } = buildFilterWhere({ tagIds: [7, 8], tagMode: 'exclude' })
+    expect(where).toBe('NOT EXISTS (SELECT 1 FROM book_tags bt WHERE bt.gallery_id = b.gallery_id AND bt.tag_id IN (?,?))')
+    expect(values).toEqual([7, 8])
+  })
+  it('資料夾「全部符合」：每一個都要在（未分類當成一個條件），參數多一個數量', () => {
+    const { where, values } = buildFilterWhere({ folders: ['uncat', 2, 5], folderMode: 'all' })
+    expect(where).toBe(
+      `(${UNCAT_SQL} AND (SELECT COUNT(DISTINCT bf.folder_id) FROM book_folders bf WHERE bf.gallery_id = b.gallery_id AND bf.folder_id IN (?,?)) = ?)`,
+    )
+    expect(values).toEqual([2, 5, 2])
+  })
+  it('資料夾「排除」：把「包含任一」整個反過來', () => {
+    const any = buildFilterWhere({ folders: ['uncat', 2, 5], folderMode: 'any' })
+    const ex = buildFilterWhere({ folders: ['uncat', 2, 5], folderMode: 'exclude' })
+    expect(ex.where).toBe(`NOT ${any.where}`)
+    expect(ex.values).toEqual([2, 5])
+  })
+  it('沒有勾選時篩選方式不產生條件', () => {
+    expect(buildFilterWhere({ folders: ['all'], folderMode: 'exclude', tagIds: [], tagMode: 'exclude' })).toEqual({
+      where: '',
+      values: [],
+    })
+    expect(hasActiveFilter({ folders: ['all'], folderMode: 'exclude', tagIds: [], tagMode: 'any', text: '' })).toBe(false)
+  })
+  it('兩種篩選方式可以混用，參數順序＝資料夾 → 標籤 → 文字', () => {
+    const r = buildFilterWhere({ folders: [3, 4], folderMode: 'all', tagIds: [9], tagMode: 'exclude', text: 'x' })
+    expect(r.values).toEqual([3, 4, 2, 9, '%x%', '%x%', '%x%', '%x%', '%x%'])
+    expect((r.where.match(/\?/g) || []).length).toBe(r.values.length)
   })
   it('不會把使用者文字拼進 SQL', () => {
     const r = buildFilterWhere({ text: "'; DROP TABLE books; --" })

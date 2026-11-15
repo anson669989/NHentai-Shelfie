@@ -238,29 +238,93 @@ const zhTW = {
   'settings.mamaHide.cover': "封面",
   'settings.mamaHide.title': "書名",
   'settings.mamaHide.note': "備註",
-  help: `【新增】到「新增」分頁輸入 gallery ID（也可以貼上網址或 #228922），按「加入」就完成，不用等網路。書名與封面會在背景依序補上；「最近加入」清單會自動更新。資料夾會記住上次的選擇，連續加入不必每本重選；資料夾欄位右邊的灰色圖示可恢復預設（未分類、未讀）。已收藏的書再加入時，只會補進新選的資料夾。
+  'filter.mode': '篩選方式',
+  'filter.mode.exclude': '排除',
+  'filter.mode.any': '包含任一',
+  'filter.mode.all': '全部符合',
+  'filter.modeHint.exclude': '所選的一個都沒有',
+  'filter.modeHint.any': '有所選的其中一個就算',
+  'filter.modeHint.all': '所選的每一個都要有',
+  'filter.modePrefix': '{mode}：{text}',
+  'settings.tagShowOriginal': '附註原文',
+  'settings.tagShowOriginalHint': '在翻譯名稱旁用灰色小字顯示原文，例如「全彩 full color」。要先開啟上方的顯示翻譯。',
+  'settings.helpHint': '各項功能怎麼用，點這裡查看',
+  help: `點一下標題可以展開或收合。
 
-【從瀏覽器分享】在 nhentai 頁面按 Android 的「分享」，選 NH Shelfie。設定 → 分享 可選兩種方式：
-・開 App 選資料夾（預設）：打開 App 並填好 ID，選好資料夾後按「加入」。
-・直接收藏：畫面留在瀏覽器，跳出「成功收藏 #ID」；已收藏過的書顯示「重複收藏」，什麼都不會改。書會放進「直接收藏時自動加入」設定的資料夾（預設是未讀），書名與封面等下次打開 App 時才補上。
+# 📥 新增書本
+- 到「新增」分頁輸入 ID（也可以貼上網址或 #228922），按「加入」就完成，不用等網路。
+- 書名與封面會在背景自動補上，「最近加入」清單會跟著更新。
+- 資料夾會記住上次的選擇；欄位右邊的灰色圖示可恢復預設（未分類、未讀）。
+- 已收藏的書再加入一次，只會補進新選的資料夾。
 
-【分類】在「資料夾」分頁上方切換資料夾，最上方固定是「全部」「未分類」「未讀」「⭐ 典藏」。新加入的書預設放進「未讀」，看完後在「未讀」裡按「⋮」→「從『未讀』移除」即可；喜歡的書可以加進「典藏」。「未分類」是指沒有放進任何自建資料夾的書（未讀、典藏不算）。選單內可新增資料夾，按住「≡」拖曳可調整順序，按「⋯」可改名或刪除。設定 → 資料夾 →「管理資料夾」（資料夾選單最下方也有）還可以新增「分隔線」把資料夾分組，分隔線一樣可以拖曳、改名、刪除。一本書可以放在多個資料夾。
+# 🔗 從瀏覽器分享
+- 在 nhentai 頁面按 Android 的「分享」，選 NH Shelfie。
+- 「開 App 選資料夾」（預設）：打開 App 並填好 ID，選好資料夾後按「加入」。
+- 「直接收藏」：畫面留在瀏覽器，跳出「成功收藏」；書名與封面等下次打開 App 才補上。
+- 直接收藏的書會放進「直接收藏時自動加入」設定的資料夾（預設是未讀）；已收藏過的書不會有任何變更。
+- 兩種方式在「設定 → 分享」切換。
 
-【單本選單】點封面右上角的「⋮」（或在「最近加入」長按一本）：查看完整標題、寫備註（點旁邊空白處自動儲存）、複製 ID、分類（勾選後立即儲存，不用按確定）、從此資料夾移除、刪除。選單右上角的灰色重新載入圖示會重新查詢這本書，更新標籤與封面（封面下載失敗時也用它重試）。找不到的書可以在這裡「修改 ID」。
+# 📁 資料夾與分類
+- 「全部」「未分類」「未讀」「⭐ 典藏」固定在最上方，不能改名或刪除。
+- 新書預設放進「未讀」；看完後按「⋮」→「從『未讀』移除」。喜歡的書可以加進「典藏」。
+- 「未分類」是指沒有放進任何自建資料夾的書（未讀、典藏不算）。
+- 一本書可以放進多個資料夾。
+- 在資料夾選單裡：按住「≡」拖曳排序，按「⋯」改名或刪除，最下方可以新增資料夾。
+- 「管理資料夾」可以新增分隔線，把資料夾分組。
 
-【標籤翻譯】設定 → 標籤翻譯：打開後，「資料夾」頁的標籤篩選會顯示翻譯名稱。翻譯有中文與日文，依介面語言顯示（繁中、简中顯示中文，日本語顯示日文，English 顯示原文）；沒有翻譯的標籤顯示原文。打原文或翻譯都搜得到。只影響標籤篩選，不會改動書的資料。開啟後每天最多從 GitHub 下載一次目前語言的翻譯資料。
+# 🔍 搜尋與篩選
+- 「資料夾」分頁上方第一列：打字找標籤、作者或社團，勾選後就會篩選。
+- 第二列：打書名、備註或 ID 搜尋；右邊是資料夾篩選，可以一次勾好幾個。
+- 「篩選方式」有三種：排除（所選的一個都沒有）、包含任一（有其中一個就算）、全部符合（每一個都要有）。
+- 標籤與資料夾的篩選方式分開設定；標籤預設「全部符合」，資料夾預設「包含任一」。
+- 「全部清除」只取消勾選；「清除全部篩選」會回到完全沒有篩選的樣子。
+- 第一列右邊可以選排序方式，每個資料夾各自記住。
 
-【多選】長按封面進入多選模式，點封面選取或取消，下方可一次分類、從此資料夾移除或刪除。按返回鍵退出多選。
+# 📖 單本選單（⋮）
+- 點封面右上角的「⋮」，或在「最近加入」長按一本。
+- 可以看完整標題、寫備註（點旁邊空白處自動儲存）、複製 ID。
+- 分類：勾選後立即儲存，不用按確定。
+- 選單右上角的灰色重新載入圖示：重新查詢這本書，更新標籤與封面（封面失敗時也用它重試）。
+- 找不到的書可以在這裡「修改 ID」。
 
-【開啟】點封面或「最近加入」的橫條會開啟該本的網頁。設定 → 開啟網頁方式 可選外部瀏覽器（預設）或 App 內瀏覽器。
+# ☑️ 多選
+- 長按封面進入多選模式，點封面選取或取消。
+- 下方可以一次分類、從此資料夾移除或刪除。
+- 按返回鍵退出多選。
 
-【媽媽模式】設定 → 媽媽模式：把封面換成灰色方塊，也可以隱藏書名或備註，並選擇要套用在哪一頁。
+# 🌐 開啟網頁
+- 點封面或「最近加入」的橫條，會開啟該本的網頁。
+- 「設定 → 開啟網頁」可選外部瀏覽器（預設）或 App 內瀏覽器。
 
-【換機與備份】設定 → 資料 → 匯出 CSV，透過分享面板存到雲端硬碟或傳給自己。新手機安裝後選「匯入 CSV」，書名與封面會依 ID 重新抓取。CSV 也包含資料夾順序、分隔線、未讀與典藏，以及分享設定。
+# 🏷️ 標籤翻譯
+- 「設定 → 標籤翻譯」打開後，標籤篩選會顯示翻譯名稱。
+- 繁中、简中顯示中文，日本語顯示日文，English 顯示原文；沒有翻譯的標籤顯示原文。
+- 打原文或翻譯都搜得到。
+- 打開「附註原文」，翻譯旁邊會用灰色小字顯示原文。
+- 只影響標籤篩選，不會改動書的資料；翻譯資料每天最多從 GitHub 下載一次。
 
-【抓不到？】畫面出現「請求太頻繁」或「網路連不上」時，App 會自動重試，不用處理。若要求安全驗證，按提示列的「進行驗證」即可。
+# 🙈 媽媽模式
+- 「設定 → 媽媽模式」：把封面換成灰色方塊，也可以隱藏書名或備註。
+- 「詳細設定」可以選要套用在哪一頁、隱藏哪些內容。
+- 點「⋮」打開的選單照常顯示。
 
-所有資料只存在這支手機上，不會上傳到任何伺服器。`,
+# 💾 備份與換機
+- 「設定 → 資料 → 匯出 CSV」，透過分享面板存到雲端硬碟或傳給自己。
+- 新手機安裝後選「匯入 CSV」，書名與封面會依 ID 重新抓取。
+- CSV 也包含資料夾順序、分隔線、未讀與典藏，以及分享設定。
+- 建議每個月匯出一次。
+
+# ⏬ 背景下載
+- 書名與封面預設只在 App 開在畫面上時才會抓。
+- 「設定 → 資料 → 背景下載」開啟後，切到別的 App 或關閉螢幕也會繼續，通知列會顯示進度。
+- 需要允許通知；速度不會變快。
+
+# ❓ 抓不到資料？
+- 出現「請求太頻繁」或「網路連不上」時，App 會自動重試，不用處理。
+- 如果要求安全驗證，按提示列的「進行驗證」。
+- 一直抓不到時，到「設定 → 進階 → 測試連線」檢查。
+
+🔒 所有資料只存在這支手機上，不會上傳到任何伺服器。`,
 }
 
 const zhCN = {
@@ -500,29 +564,93 @@ const zhCN = {
   'settings.mamaHide.cover': "封面",
   'settings.mamaHide.title': "标题",
   'settings.mamaHide.note': "备注",
-  help: `【添加】在“添加”页输入 gallery ID（也可以粘贴网址或 #228922），点“添加”即可，无需等待网络。标题和封面会在后台依次补全，“最近添加”列表会自动更新。文件夹会记住上次的选择，连续添加时不用每本都重新选；文件夹栏右边的灰色图标可以恢复默认（未分类、未读）。已收藏的本子再次添加时，只会加入新选的文件夹。
+  'filter.mode': '筛选方式',
+  'filter.mode.exclude': '排除',
+  'filter.mode.any': '包含任一',
+  'filter.mode.all': '全部符合',
+  'filter.modeHint.exclude': '所选的一个都没有',
+  'filter.modeHint.any': '有所选的任意一个即可',
+  'filter.modeHint.all': '所选的每一个都要有',
+  'filter.modePrefix': '{mode}：{text}',
+  'settings.tagShowOriginal': '附注原文',
+  'settings.tagShowOriginalHint': '在翻译名称旁用灰色小字显示原文，例如“全彩 full color”。需要先开启上方的显示翻译。',
+  'settings.helpHint': '各项功能怎么用，点这里查看',
+  help: `点一下标题可以展开或收起。
 
-【从浏览器分享】在 nhentai 页面点 Android 的“分享”，选择 NH Shelfie。设置 → 分享 可以选两种方式：
-・打开 App 选文件夹（默认）：打开 App 并填好 ID，选好文件夹后点“添加”。
-・直接收藏：停留在浏览器，提示“成功收藏 #ID”；已收藏过的本子提示“重复收藏”，不会做任何更改。本子会放进“直接收藏时自动加入”设置的文件夹（默认是未读），标题和封面要等下次打开 App 时才补全。
+# 📥 添加本子
+- 在“添加”页输入 ID（也可以粘贴网址或 #228922），点“添加”即可，无需等待网络。
+- 标题和封面会在后台自动补全，“最近添加”列表会跟着更新。
+- 文件夹会记住上次的选择；文件夹栏右边的灰色图标可以恢复默认（未分类、未读）。
+- 已收藏的本子再次添加时，只会加入新选的文件夹。
 
-【分类】在“文件夹”页顶部切换文件夹，最上方固定是“全部”“未分类”“未读”“⭐ 典藏”。新添加的本子默认放进“未读”，看完后在“未读”里点“⋮”→“从‘未读’移除”即可；喜欢的本子可以加进“典藏”。“未分类”指没有放进任何自建文件夹的本子（未读、典藏不算）。菜单里可以新建文件夹，按住“≡”拖动可以调整顺序，点“⋯”可以重命名或删除。设置 → 文件夹 →“管理文件夹”（文件夹菜单最下方也有）还可以新建“分隔线”给文件夹分组，分隔线同样可以拖动、重命名、删除。一本可以放进多个文件夹。
+# 🔗 从浏览器分享
+- 在 nhentai 页面点 Android 的“分享”，选择 NH Shelfie。
+- “打开 App 选文件夹”（默认）：打开 App 并填好 ID，选好文件夹后点“添加”。
+- “直接收藏”：停留在浏览器，提示“成功收藏”；标题和封面要等下次打开 App 时才补全。
+- 直接收藏的本子会放进“直接收藏时自动加入”设置的文件夹（默认是未读）；已收藏过的本子不会有任何更改。
+- 两种方式在“设置 → 分享”切换。
 
-【单本菜单】点封面右上角的“⋮”（或在“最近添加”长按一本）：查看完整标题、写备注（点旁边空白处自动保存）、复制 ID、分类（勾选后立即保存，不用点确定）、从此文件夹移除、删除。菜单右上角的灰色重新加载图标会重新查询这本，更新标签和封面（封面下载失败时也用它重试）。找不到的本子可以在这里“修改 ID”。
+# 📁 文件夹与分类
+- “全部”“未分类”“未读”“⭐ 典藏”固定在最上方，不能重命名或删除。
+- 新本子默认放进“未读”；看完后点“⋮”→“从‘未读’移除”。喜欢的本子可以加进“典藏”。
+- “未分类”指没有放进任何自建文件夹的本子（未读、典藏不算）。
+- 一本可以放进多个文件夹。
+- 在文件夹菜单里：按住“≡”拖动排序，点“⋯”重命名或删除，最下方可以新建文件夹。
+- “管理文件夹”可以新建分隔线，给文件夹分组。
 
-【标签翻译】设置 → 标签翻译：打开后，“文件夹”页的标签筛选会显示翻译名称。翻译有中文和日文，按界面语言显示（繁中、简中显示中文，日本語显示日文，English 显示原文）；没有翻译的标签显示原文。输入原文或翻译都能搜到。只影响标签筛选，不会改动本子的数据。开启后每天最多从 GitHub 下载一次当前语言的翻译数据。
+# 🔍 搜索与筛选
+- “文件夹”页顶部第一行：输入文字查找标签、作者或社团，勾选后即可筛选。
+- 第二行：输入标题、备注或 ID 搜索；右边是文件夹筛选，可以一次勾选多个。
+- “筛选方式”有三种：排除（所选的一个都没有）、包含任一（有任意一个即可）、全部符合（每一个都要有）。
+- 标签和文件夹的筛选方式分开设置；标签默认“全部符合”，文件夹默认“包含任一”。
+- “全部清除”只取消勾选；“清除全部筛选”会回到完全没有筛选的状态。
+- 第一行右边可以选择排序方式，每个文件夹各自记住。
 
-【多选】长按封面进入多选模式，点封面选中或取消，底部可以批量分类、从此文件夹移除或删除。按返回键退出多选。
+# 📖 单本菜单（⋮）
+- 点封面右上角的“⋮”，或在“最近添加”长按一本。
+- 可以查看完整标题、写备注（点旁边空白处自动保存）、复制 ID。
+- 分类：勾选后立即保存，不用点确定。
+- 菜单右上角的灰色重新加载图标：重新查询这本，更新标签和封面（封面失败时也用它重试）。
+- 找不到的本子可以在这里“修改 ID”。
 
-【打开】点封面或“最近添加”的横条会打开对应网页。设置 → 打开网页方式 可选外部浏览器（默认）或 App 内浏览器。
+# ☑️ 多选
+- 长按封面进入多选模式，点封面选中或取消。
+- 底部可以批量分类、从此文件夹移除或删除。
+- 按返回键退出多选。
 
-【妈妈模式】设置 → 妈妈模式：把封面换成灰色方块，也可以隐藏标题或备注，并选择应用在哪一页。
+# 🌐 打开网页
+- 点封面或“最近添加”的横条，会打开对应的网页。
+- “设置 → 打开网页”可选外部浏览器（默认）或 App 内浏览器。
 
-【换机与备份】设置 → 数据 → 导出 CSV，通过分享面板保存到网盘或发给自己。新手机安装后选择“导入 CSV”，标题和封面会根据 ID 重新获取。CSV 也包含文件夹顺序、分隔线、未读和典藏，以及分享设置。
+# 🏷️ 标签翻译
+- “设置 → 标签翻译”打开后，标签筛选会显示翻译名称。
+- 繁中、简中显示中文，日本語显示日文，English 显示原文；没有翻译的标签显示原文。
+- 输入原文或翻译都能搜到。
+- 打开“附注原文”，翻译旁边会用灰色小字显示原文。
+- 只影响标签筛选，不会改动本子的数据；翻译数据每天最多从 GitHub 下载一次。
 
-【获取不到？】出现“请求太频繁”或“网络连接不上”时，App 会自动重试，无需处理。如果要求安全验证，点提示栏里的“进行验证”即可。
+# 🙈 妈妈模式
+- “设置 → 妈妈模式”：把封面换成灰色方块，也可以隐藏标题或备注。
+- “详细设置”可以选择应用在哪一页、隐藏哪些内容。
+- 点“⋮”打开的菜单照常显示。
 
-所有数据只保存在这台手机上，不会上传到任何服务器。`,
+# 💾 备份与换机
+- “设置 → 数据 → 导出 CSV”，通过分享面板保存到网盘或发给自己。
+- 新手机安装后选择“导入 CSV”，标题和封面会根据 ID 重新获取。
+- CSV 也包含文件夹顺序、分隔线、未读和典藏，以及分享设置。
+- 建议每个月导出一次。
+
+# ⏬ 后台下载
+- 标题和封面默认只在 App 显示在屏幕上时才会获取。
+- “设置 → 数据 → 后台下载”开启后，切到别的 App 或关闭屏幕也会继续，通知栏会显示进度。
+- 需要允许通知；速度不会变快。
+
+# ❓ 获取不到数据？
+- 出现“请求太频繁”或“网络连接不上”时，App 会自动重试，无需处理。
+- 如果要求安全验证，点提示栏里的“进行验证”。
+- 一直获取不到时，到“设置 → 高级 → 测试连接”检查。
+
+🔒 所有数据只保存在这台手机上，不会上传到任何服务器。`,
 }
 
 const en = {
@@ -762,29 +890,93 @@ const en = {
   'settings.mamaHide.cover': "Covers",
   'settings.mamaHide.title': "Titles",
   'settings.mamaHide.note': "Notes",
-  help: `[Add] In the Add tab, enter a gallery ID (a URL or #228922 also works) and tap Add — no waiting for the network. Title and cover are filled in one by one in the background, and the "Recently added" list updates by itself. Your last folder choice is remembered, so you don't have to pick it again for every item; the grey icon to the right of the folder field resets it to the default (Uncategorized, Unread). Adding an item you already have only puts it into the newly selected folders.
+  'filter.mode': 'Mode',
+  'filter.mode.exclude': 'Exclude',
+  'filter.mode.any': 'Any',
+  'filter.mode.all': 'All',
+  'filter.modeHint.exclude': 'Has none of the selected',
+  'filter.modeHint.any': 'Has at least one of the selected',
+  'filter.modeHint.all': 'Has every one of the selected',
+  'filter.modePrefix': '{mode}: {text}',
+  'settings.tagShowOriginal': 'Show original names too',
+  'settings.tagShowOriginalHint': 'Shows the original tag in small grey text next to the translation, e.g. "全彩 full color". Needs the translation switch above to be on.',
+  'settings.helpHint': 'Tap here to see how each feature works',
+  help: `Tap a title to expand or collapse it.
 
-[Share from browser] On an nhentai page, tap Android's Share and choose NH Shelfie. Settings → Sharing offers two modes:
-・Open app to choose (default): the app opens with the ID filled in; pick folders and tap Add.
-・Save instantly: you stay in the browser and see "Saved #ID". Items you already have show "already saved" and nothing is changed. New items go into the folders set in "Folders for instant saves" (Unread by default); the title and cover are filled in the next time you open the app.
+# 📥 Adding items
+- In the Add tab, enter an ID (a URL or #228922 also works) and tap Add — no waiting for the network.
+- Title and cover are filled in automatically in the background, and "Recently added" updates by itself.
+- Your last folder choice is remembered; the grey icon to the right of the folder field resets it to the default (Uncategorized, Unread).
+- Adding an item you already have only puts it into the newly selected folders.
 
-[Folders] Switch folders at the top of the Folders tab. All, Uncategorized, Unread and ⭐ Favorites are always at the top. New items go into Unread by default — when you're done with one, open "⋮" in Unread and choose Remove from "Unread". Add the ones you like to Favorites. Uncategorized means items that aren't in any folder you created (Unread and Favorites don't count). Create folders from the menu; drag the "≡" handle to reorder, or tap "⋯" to rename or delete. Settings → Folders → Manage folders (also at the bottom of the folder menu) lets you add dividers to group your folders; dividers can be dragged, renamed and deleted too. An item can be in several folders.
+# 🔗 Sharing from the browser
+- On an nhentai page, tap Android's Share and choose NH Shelfie.
+- "Open app to choose" (default): the app opens with the ID filled in; pick folders and tap Add.
+- "Save instantly": you stay in the browser and see "Saved". Title and cover are filled in the next time you open the app.
+- Instantly saved items go into the folders set in "Folders for instant saves" (Unread by default); items you already have are left unchanged.
+- Switch between the two in Settings → Sharing.
 
-[Item menu] Tap "⋮" at the top-right of a cover (or long-press an item in "Recently added") to see the full titles, write a note (saved when you tap elsewhere), copy the ID, choose folders (saved as you tick, no OK button needed), remove from this folder or delete. The grey reload icon at the top right of the menu looks the item up again and updates its tags and cover (use it to retry a failed cover too). For items that were not found, you can "Change ID" here.
+# 📁 Folders
+- All, Uncategorized, Unread and ⭐ Favorites are always at the top and can't be renamed or deleted.
+- New items go into Unread by default; when you're done with one, tap "⋮" → Remove from "Unread". Add the ones you like to Favorites.
+- Uncategorized means items that aren't in any folder you created (Unread and Favorites don't count).
+- An item can be in several folders.
+- In the folder menu: drag "≡" to reorder, tap "⋯" to rename or delete, and create a new folder at the bottom.
+- Manage folders lets you add dividers to group your folders.
 
-[Tag translation] Settings → Tag translation: when on, the tag filter on the Folders tab shows translated names. Chinese and Japanese translations are available and follow the app language (繁中 / 简中 show Chinese, 日本語 shows Japanese, English shows the original tags); tags without a translation stay as they are. You can search by either the original or the translated name. It only affects the tag filter and never changes your items. When on, translation data for the current language is downloaded from GitHub at most once a day.
+# 🔍 Search and filters
+- First row of the Folders tab: type to find a tag, artist or group, then tick it to filter.
+- Second row: search by title, note or ID; the folder filter on the right lets you tick several folders.
+- "Mode" has three choices: Exclude (has none of the selected), Any (has at least one), All (has every one).
+- Tags and folders each have their own mode; tags default to All, folders default to Any.
+- "Clear all" only unticks; "Clear all filters" goes back to no filtering at all.
+- Choose the sort order on the right of the first row; each folder remembers its own.
 
-[Multi-select] Long-press a cover to start selecting; tap covers to select or deselect, then use the bottom bar to add to folders, remove from this folder or delete. Press Back to leave multi-select.
+# 📖 Item menu (⋮)
+- Tap "⋮" at the top-right of a cover, or long-press an item in "Recently added".
+- See the full titles, write a note (saved when you tap elsewhere) and copy the ID.
+- Folders are saved as you tick them — no OK button needed.
+- The grey reload icon at the top right of the menu looks the item up again and updates its tags and cover (use it to retry a failed cover too).
+- For items that were not found, you can "Change ID" here.
 
-[Open] Tap a cover or a row in "Recently added" to open its page. Settings → Open pages in lets you choose the external browser (default) or the in-app browser.
+# ☑️ Multi-select
+- Long-press a cover to start selecting; tap covers to select or deselect.
+- Use the bottom bar to add to folders, remove from this folder or delete.
+- Press Back to leave multi-select.
 
-[Privacy mode] Settings → Privacy mode replaces covers with grey boxes and can also hide titles or notes, on the pages you choose.
+# 🌐 Opening pages
+- Tap a cover or a row in "Recently added" to open its page.
+- Settings → Opening pages lets you choose the external browser (default) or the in-app browser.
 
-[Backup / new phone] Settings → Data → Export CSV, then save it via the share sheet. On the new phone, Import CSV and titles and covers are fetched again by ID. The CSV also keeps your folder order, dividers, Unread and Favorites, and sharing settings.
+# 🏷️ Tag translation
+- Turn it on in Settings → Tag translation and the tag filter shows translated names.
+- 繁中 / 简中 show Chinese, 日本語 shows Japanese, English shows the original tags; tags without a translation stay as they are.
+- You can search by either the original or the translated name.
+- Turn on "Show original names too" to see the original in small grey text next to the translation.
+- It only affects the tag filter and never changes your items; translation data is downloaded from GitHub at most once a day.
 
-[Not loading?] "Too many requests" or "Can't connect" messages are retried automatically. If the site asks for verification, tap "Verify" on the notice bar.
+# 🙈 Privacy mode
+- Settings → Privacy mode replaces covers with grey boxes and can also hide titles or notes.
+- "Details" lets you choose which pages it applies to and what to hide.
+- Menus opened with "⋮" are shown as usual.
 
-All data stays on this device and is never uploaded anywhere.`,
+# 💾 Backup / new phone
+- Settings → Data → Export CSV, then save it to cloud storage or send it to yourself via the share sheet.
+- On the new phone, choose Import CSV; titles and covers are fetched again by ID.
+- The CSV also keeps your folder order, dividers, Unread and Favorites, and sharing settings.
+- Exporting about once a month is a good habit.
+
+# ⏬ Background download
+- By default, titles and covers are only fetched while the app is on screen.
+- Turn on Settings → Data → Background download to keep going when you switch apps or turn off the screen; a notification shows the progress.
+- It needs notification permission and does not make fetching faster.
+
+# ❓ Not loading?
+- "Too many requests" or "Can't connect" messages are retried automatically — nothing to do.
+- If the site asks for verification, tap "Verify" on the notice bar.
+- If it keeps failing, check Settings → Advanced → Test connection.
+
+🔒 All data stays on this device and is never uploaded anywhere.`,
 }
 
 const ja = {
@@ -1024,29 +1216,93 @@ const ja = {
   'settings.mamaHide.cover': "表紙",
   'settings.mamaHide.title': "タイトル",
   'settings.mamaHide.note': "メモ",
-  help: `【追加】「追加」タブで gallery ID（URL や #228922 も可）を入力し、「追加」を押すだけで完了です。通信を待つ必要はありません。タイトルと表紙はバックグラウンドで順番に取得され、「最近追加」の一覧も自動で更新されます。前回選んだフォルダを覚えているので、続けて追加するときに毎回選び直す必要はありません。フォルダ欄の右にある灰色のアイコンで初期設定（未分類・未読）に戻せます。保存済みの作品を追加した場合は、新しく選んだフォルダに入れるだけです。
+  'filter.mode': '条件',
+  'filter.mode.exclude': '除外',
+  'filter.mode.any': 'いずれか',
+  'filter.mode.all': 'すべて',
+  'filter.modeHint.exclude': '選んだものを 1 つも含まない',
+  'filter.modeHint.any': '選んだもののどれか 1 つを含む',
+  'filter.modeHint.all': '選んだものをすべて含む',
+  'filter.modePrefix': '{mode}：{text}',
+  'settings.tagShowOriginal': '原文も表示',
+  'settings.tagShowOriginalHint': '翻訳名の横に原文を小さな灰色の文字で表示します（例：「フルカラー full color」）。上の翻訳表示をオンにしているときだけ有効です。',
+  'settings.helpHint': '各機能の使い方はこちら',
+  help: `見出しをタップすると開閉できます。
 
-【ブラウザから共有】nhentai のページで Android の「共有」から NH Shelfie を選びます。設定 → 共有 で 2 つの方法を選べます：
-・アプリを開いて選ぶ（既定）：アプリが開いて ID が入力されるので、フォルダを選んで「追加」を押します。
-・すぐに保存：ブラウザに留まったまま「#ID を保存しました」と表示されます。保存済みの作品は「保存済み」と表示され、何も変更されません。作品は「すぐに保存するときの追加先」のフォルダ（既定は未読）に入り、タイトルと表紙は次にアプリを開いたときに取得します。
+# 📥 作品を追加
+- 「追加」タブで ID（URL や #228922 も可）を入力し、「追加」を押すだけで完了です。通信を待つ必要はありません。
+- タイトルと表紙はバックグラウンドで自動的に取得され、「最近追加」の一覧も更新されます。
+- 前回選んだフォルダを覚えています。フォルダ欄の右にある灰色のアイコンで初期設定（未分類・未読）に戻せます。
+- 保存済みの作品をもう一度追加すると、新しく選んだフォルダに入るだけです。
 
-【フォルダ】「フォルダ」タブ上部でフォルダを切り替えます。先頭には常に「すべて」「未分類」「未読」「⭐ お気に入り」があります。新しく追加した作品は既定で「未読」に入ります。読み終えたら「未読」で「⋮」→『「未読」から外す』を選んでください。気に入った作品は「お気に入り」に追加できます。「未分類」は自分で作ったフォルダに 1 つも入っていない作品です（未読・お気に入りは含みません）。メニューから新規作成でき、「≡」を押さえてドラッグすると並べ替え、「⋯」で名前の変更・削除ができます。設定 → フォルダ →「フォルダを管理」（フォルダメニューの一番下にもあります）では「区切り線」を追加してフォルダをグループ分けでき、区切り線もドラッグ・名前の変更・削除ができます。1 つの作品を複数のフォルダに入れられます。
+# 🔗 ブラウザから共有
+- nhentai のページで Android の「共有」から NH Shelfie を選びます。
+- 「アプリを開いて選ぶ」（既定）：アプリが開いて ID が入力されるので、フォルダを選んで「追加」を押します。
+- 「すぐに保存」：ブラウザに留まったまま「保存しました」と表示されます。タイトルと表紙は次にアプリを開いたときに取得します。
+- すぐに保存した作品は「すぐに保存するときの追加先」のフォルダ（既定は未読）に入ります。保存済みの作品は何も変更されません。
+- 2 つの方法は「設定 → 共有」で切り替えます。
 
-【作品メニュー】表紙右上の「⋮」（または「最近追加」の行を長押し）で、完全なタイトルの確認、メモ（ほかの場所をタップで自動保存）、ID のコピー、フォルダ選択（チェックするとすぐ保存、確定ボタンは不要）、このフォルダから外す、削除ができます。メニュー右上の灰色の再読み込みアイコンで作品を再取得し、タグと表紙を更新します（表紙の取得に失敗したときの再試行にも使えます）。見つからなかった作品はここで「ID を修正」できます。
+# 📁 フォルダと分類
+- 「すべて」「未分類」「未読」「⭐ お気に入り」は常に先頭にあり、名前の変更や削除はできません。
+- 新しい作品は既定で「未読」に入ります。読み終えたら「⋮」→『「未読」から外す』。気に入った作品は「お気に入り」に追加できます。
+- 「未分類」は自分で作ったフォルダに 1 つも入っていない作品です（未読・お気に入りは含みません）。
+- 1 つの作品を複数のフォルダに入れられます。
+- フォルダメニューでは、「≡」を押さえてドラッグで並べ替え、「⋯」で名前の変更・削除、一番下で新規作成ができます。
+- 「フォルダを管理」では区切り線を追加して、フォルダをグループ分けできます。
 
-【タグ翻訳】設定 → タグ翻訳：オンにすると、「フォルダ」タブのタグ絞り込みに翻訳名が表示されます。翻訳は中国語と日本語があり、アプリの言語に合わせて表示されます（繁中・简中は中国語、日本語は日本語、English は原文）。翻訳のないタグは原文のまま表示されます。原文でも翻訳名でも検索できます。タグの絞り込みだけに影響し、作品のデータは変更しません。オンにすると、現在の言語の翻訳データを GitHub から 1 日 1 回まで取得します。
+# 🔍 検索と絞り込み
+- 「フォルダ」タブ上部の 1 行目：文字を入力してタグ・作者・サークルを探し、チェックすると絞り込まれます。
+- 2 行目：タイトル・メモ・ID で検索します。右側はフォルダの絞り込みで、複数チェックできます。
+- 「条件」は 3 種類：除外（選んだものを 1 つも含まない）、いずれか（どれか 1 つを含む）、すべて（すべてを含む）。
+- タグとフォルダの条件は別々に設定します。タグの既定は「すべて」、フォルダの既定は「いずれか」です。
+- 「すべて解除」はチェックを外すだけです。「絞り込みをすべて解除」は絞り込みのない状態に戻します。
+- 1 行目の右側で並び順を選べます。フォルダごとに覚えています。
 
-【複数選択】表紙を長押しすると複数選択モードになります。表紙をタップして選択・解除し、下のバーでまとめてフォルダ追加・このフォルダから外す・削除ができます。戻るボタンで終了します。
+# 📖 作品メニュー（⋮）
+- 表紙右上の「⋮」をタップ、または「最近追加」の行を長押しします。
+- 完全なタイトルの確認、メモ（ほかの場所をタップで自動保存）、ID のコピーができます。
+- フォルダ選択：チェックするとすぐ保存されます。確定ボタンは不要です。
+- メニュー右上の灰色の再読み込みアイコン：作品を再取得し、タグと表紙を更新します（表紙の取得に失敗したときの再試行にも使えます）。
+- 見つからなかった作品はここで「ID を修正」できます。
 
-【開く】表紙または「最近追加」の行をタップするとページを開きます。設定 → ページの開き方 で外部ブラウザ（既定）かアプリ内ブラウザを選べます。
+# ☑️ 複数選択
+- 表紙を長押しすると複数選択モードになり、表紙をタップして選択・解除します。
+- 下のバーでまとめてフォルダ追加・このフォルダから外す・削除ができます。
+- 戻るボタンで終了します。
 
-【ママモード】設定 → ママモード で表紙を灰色の四角にし、タイトルやメモも隠せます。適用するページも選べます。
+# 🌐 ページを開く
+- 表紙または「最近追加」の行をタップすると、その作品のページを開きます。
+- 「設定 → ページを開く」で外部ブラウザ（既定）かアプリ内ブラウザを選べます。
 
-【バックアップ】設定 → データ → CSV をエクスポートし、共有メニューから保存します。新しい端末でインポートすると、タイトルと表紙を ID から再取得します。CSV にはフォルダの順序・区切り線・未読とお気に入り・共有設定も含まれます。
+# 🏷️ タグ翻訳
+- 「設定 → タグ翻訳」をオンにすると、タグの絞り込みに翻訳名が表示されます。
+- 繁中・简中は中国語、日本語は日本語、English は原文で表示されます。翻訳のないタグは原文のままです。
+- 原文でも翻訳名でも検索できます。
+- 「原文も表示」をオンにすると、翻訳名の横に原文が小さな灰色の文字で表示されます。
+- タグの絞り込みだけに影響し、作品のデータは変更しません。翻訳データは GitHub から 1 日 1 回まで取得します。
 
-【取得できない時】「リクエストが多すぎます」「接続できません」と表示されても自動で再試行されます。サイトの認証を求められたら、通知バーの「確認する」を押してください。
+# 🙈 ママモード
+- 「設定 → ママモード」で表紙を灰色の四角にし、タイトルやメモも隠せます。
+- 「詳細設定」で適用するページと隠す内容を選べます。
+- 「⋮」で開くメニューは通常どおり表示されます。
 
-すべてのデータはこの端末内だけに保存され、どこにもアップロードされません。`,
+# 💾 バックアップと機種変更
+- 「設定 → データ → CSV をエクスポート」し、共有メニューからクラウドに保存するか自分に送ります。
+- 新しい端末で「CSV をインポート」を選ぶと、タイトルと表紙を ID から再取得します。
+- CSV にはフォルダの順序・区切り線・未読とお気に入り・共有設定も含まれます。
+- 月に 1 回ほどエクスポートしておくと安心です。
+
+# ⏬ バックグラウンドでダウンロード
+- タイトルと表紙は、既定ではアプリを画面に表示している間だけ取得します。
+- 「設定 → データ → バックグラウンドでダウンロード」をオンにすると、ほかのアプリに切り替えたり画面を消したりしても続行し、通知に進み具合が表示されます。
+- 通知の許可が必要です。取得が速くなるわけではありません。
+
+# ❓ 取得できない時
+- 「リクエストが多すぎます」「接続できません」と表示されても自動で再試行されます。操作は不要です。
+- サイトの認証を求められたら、通知バーの「確認する」を押してください。
+- ずっと取得できないときは「設定 → 詳細 → 接続テスト」で確認してください。
+
+🔒 すべてのデータはこの端末内だけに保存され、どこにもアップロードされません。`,
 }
 
 export const DICTS = { 'zh-TW': zhTW, 'zh-CN': zhCN, en, ja }

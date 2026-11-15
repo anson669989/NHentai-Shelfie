@@ -43,8 +43,13 @@
       <!-- 動作選單 -->
       <div v-else-if="d.kind === 'sheet'" class="sheet" :class="{ tall: d.tall }">
         <!-- 標題列（固定、不捲動）：右側可有重新載入等小圖示鈕；多選模式有「全部清除」 -->
-        <div v-if="d.title || d.multi?.clear || d.headAction" class="sheet-head">
+        <div v-if="d.title || d.multi?.clear || d.headAction" class="sheet-head" :class="{ 'has-mode': d.multi?.mode }">
           <h3 class="sheet-title">{{ d.title }}</h3>
+          <!-- 多選選單的「篩選方式」（排除／包含任一／全部符合）：緊接在灰色標題旁 -->
+          <template v-if="d.multi?.mode">
+            <ModePicker :model-value="d.multi.mode.value" @update:model-value="setMode(d, $event)" />
+            <span class="spacer" />
+          </template>
           <button
             v-if="d.headAction"
             class="sheet-head-btn"
@@ -121,6 +126,27 @@
         </button>
       </div>
 
+      <!-- 使用說明：每個主題一列，點標題展開條列內容（可同時展開多個） -->
+      <div v-else-if="d.kind === 'help'" class="sheet help-sheet">
+        <div class="sheet-head">
+          <h3 class="help-title">{{ d.title }}</h3>
+        </div>
+        <div class="sheet-body help-body">
+          <p v-for="(line, i) in d.intro" :key="'i' + i" class="help-intro">{{ line }}</p>
+          <section v-for="(s, i) in d.sections" :key="i" class="help-sec" :class="{ open: d.opened[i] }">
+            <button type="button" class="help-sec-head" :aria-expanded="!!d.opened[i]" @click="d.opened[i] = !d.opened[i]">
+              <span class="help-sec-title">{{ s.title }}</span>
+              <span class="help-caret" aria-hidden="true">›</span>
+            </button>
+            <ul v-if="d.opened[i]" class="help-list">
+              <li v-for="(item, k) in s.items" :key="k">{{ item }}</li>
+            </ul>
+          </section>
+          <p v-for="(line, i) in d.footer" :key="'f' + i" class="help-foot">{{ line }}</p>
+        </div>
+        <button class="sheet-item cancel" @click="closeDialog(d, false)">{{ t('common.close') }}</button>
+      </div>
+
       <!-- 多選清單（項目可含 { divider: true } 與分隔線 { separator: true, label }） -->
       <div v-else-if="d.kind === 'checklist'" class="sheet">
         <h3 class="sheet-title">{{ d.title }}</h3>
@@ -157,6 +183,7 @@ import { ui, closeDialog, toast } from '../ui.js'
 import { t, errText } from '../i18n.js'
 import { singleLine } from '../services/parse.js'
 import { startDragSort, moveItem } from './dragSort.js'
+import ModePicker from './ModePicker.vue'
 
 /** 動作選單裡可拖曳的列（a.drag）：按住 ≡ 拖曳，放開後先改畫面，再交給 d.onReorder 寫入；失敗就還原 */
 function onDragStart(e, d) {
@@ -202,6 +229,15 @@ async function pick(d, a) {
   if (!isMulti(d, a)) return closeDialog(d, a.value)
   try {
     d.multi.selected = await d.multi.toggle(a.value)
+  } catch (err) {
+    toast(errText(err))
+  }
+}
+
+/** 多選選單的篩選方式：交給 d.multi.mode.set 套用，換成它回傳的值 */
+async function setMode(d, mode) {
+  try {
+    d.multi.mode.value = await d.multi.mode.set(mode)
   } catch (err) {
     toast(errText(err))
   }

@@ -1,5 +1,7 @@
 // 純函式：收藏頁的搜尋與篩選（不碰資料庫；SQL 只組參數化的 WHERE，由 library.js 執行）。
-// 三個條件的組合：標籤（且）且 資料夾（或）且 文字。
+// 三個條件的組合：標籤 且 資料夾 且 文字。
+// 標籤與資料夾各有一個「篩選方式」：exclude（排除＝所選的一個都沒有）、any（包含任一）、all（全部符合）；
+// 預設是 標籤＝all、資料夾＝any。
 
 /** 資料夾篩選的值：'all' | 'uncat' | 資料夾 id（整數；含系統資料夾「未讀」「典藏」） */
 const ALL = 'all'
@@ -51,6 +53,13 @@ export function toggleFolderFilter(current, key) {
 
 export const isAllFolders = (f) => !f?.length || f.includes(ALL)
 
+/** 篩選方式（選單由上到下的順序）：排除、包含任一、全部符合 */
+export const FILTER_MODES = Object.freeze(['exclude', 'any', 'all'])
+export const DEFAULT_TAG_MODE = 'all'
+export const DEFAULT_FOLDER_MODE = 'any'
+/** 整理篩選方式：不是三個值之一就用 fallback */
+export const normalizeFilterMode = (value, fallback) => (FILTER_MODES.includes(value) ? value : fallback)
+
 /** 排序依據：只選一個（含「全部」「未分類」）用它記住的排序；選多個用「全部」的排序 */
 export function sortKeyOf(folderFilter) {
   const f = normalizeFolderFilter(folderFilter)
@@ -71,33 +80,53 @@ export function normalizeSearchText(s) {
 
 /**
  * 組出列表查詢的 WHERE（books 別名 b）。全部參數化。
- * @param {{folders?:any[], tagIds?:number[], text?:string}} filter
+ * 篩選方式只在有勾選時才有作用（資料夾為「全部」或沒勾標籤時不產生條件）：
+ * - 資料夾 any：在所選的任一個裡；all：所選的每一個都在（「未分類」當成一個條件）；exclude：所選的一個都不在
+ * - 標籤 all：所選的每一個都有；any：有其中一個；exclude：一個都沒有（還沒補完資料、沒有標籤的書也算）
+ * @param {{folders?:any[], folderMode?:string, tagIds?:number[], tagMode?:string, text?:string}} filter
  * @returns {{where:string, values:any[]}} where 不含 "WHERE" 關鍵字；沒有條件時為空字串
  */
-export function buildFilterWhere({ folders = [ALL], tagIds = [], text = '' } = {}) {
+export function buildFilterWhere({ folders = [ALL], folderMode, tagIds = [], tagMode, text = '' } = {}) {
   const parts = []
   const values = []
 
   const f = normalizeFolderFilter(folders)
   if (!isAllFolders(f)) {
-    const or = []
-    if (f.includes(UNCAT)) or.push(UNCAT_SQL)
+    const fm = normalizeFilterMode(folderMode, DEFAULT_FOLDER_MODE)
+    const conds = []
+    if (f.includes(UNCAT)) conds.push(UNCAT_SQL)
     const ids = f.filter((k) => k !== UNCAT)
     if (ids.length) {
-      or.push(
-        `EXISTS (SELECT 1 FROM book_folders bf WHERE bf.gallery_id = b.gallery_id AND bf.folder_id IN (${ids.map(() => '?').join(',')}))`,
-      )
-      values.push(...ids)
+      const marks = ids.map(() => '?').join(',')
+      if (fm === 'all') {
+        conds.push(
+          `(SELECT COUNT(DISTINCT bf.folder_id) FROM book_folders bf WHERE bf.gallery_id = b.gallery_id AND bf.folder_id IN (${marks})) = ?`,
+        )
+        values.push(...ids, ids.length)
+      } else {
+        conds.push(`EXISTS (SELECT 1 FROM book_folders bf WHERE bf.gallery_id = b.gallery_id AND bf.folder_id IN (${marks}))`)
+        values.push(...ids)
+      }
     }
-    parts.push(`(${or.join(' OR ')})`)
+    const joined = `(${conds.join(fm === 'all' ? ' AND ' : ' OR ')})`
+    parts.push(fm === 'exclude' ? `NOT ${joined}` : joined)
   }
 
   const tags = [...new Set((tagIds || []).map(Number).filter((n) => Number.isSafeInteger(n) && n > 0))]
   if (tags.length) {
-    parts.push(
-      `b.gallery_id IN (SELECT gallery_id FROM book_tags WHERE tag_id IN (${tags.map(() => '?').join(',')}) GROUP BY gallery_id HAVING COUNT(DISTINCT tag_id) = ?)`,
-    )
-    values.push(...tags, tags.length)
+    const tm = normalizeFilterMode(tagMode, DEFAULT_TAG_MODE)
+    const marks = tags.map(() => '?').join(',')
+    if (tm === 'all') {
+      parts.push(
+        `b.gallery_id IN (SELECT gallery_id FROM book_tags WHERE tag_id IN (${marks}) GROUP BY gallery_id HAVING COUNT(DISTINCT tag_id) = ?)`,
+      )
+      values.push(...tags, tags.length)
+    } else {
+      parts.push(
+        `${tm === 'exclude' ? 'NOT ' : ''}EXISTS (SELECT 1 FROM book_tags bt WHERE bt.gallery_id = b.gallery_id AND bt.tag_id IN (${marks}))`,
+      )
+      values.push(...tags)
+    }
   }
 
   const q = normalizeSearchText(text)
