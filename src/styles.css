@@ -469,9 +469,13 @@ input[type='search']::-webkit-search-cancel-button { -webkit-appearance: none; d
 .help-sec-title { flex: 1; min-width: 0; }
 .help-caret { flex-shrink: 0; color: var(--muted); font-size: 20px; line-height: 1; transition: transform .15s; }
 .help-sec.open .help-caret { transform: rotate(90deg); }
+/* 展開後的內容：每組＝粗體小標（問題或一句功能描述）＋底下的條列；組與組之間留白 */
+.help-content { display: flex; flex-direction: column; gap: 18px; padding: 2px 14px 18px; }
+.help-group { display: flex; flex-direction: column; gap: 6px; }
+.help-lead { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.5; color: var(--text); }
 .help-list {
-  margin: 0; padding: 2px 14px 16px 32px; display: flex; flex-direction: column; gap: 10px;
-  font-size: 15px; line-height: 1.65; word-break: break-word;
+  margin: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 6px;
+  font-size: 14px; line-height: 1.65; word-break: break-word;
 }
 .help-list li::marker { color: var(--primary); }
 .help-foot { flex-shrink: 0; margin: 4px 0 0; padding: 8px 12px; font-size: 13px; line-height: 1.6; color: var(--muted); text-align: center; }

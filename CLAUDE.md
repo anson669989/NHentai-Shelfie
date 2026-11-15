@@ -23,7 +23,7 @@ Capacitor + Vue 3 的 Android App：輸入 gallery ID，背景抓書名與封面
 - `src/components/bookActions.js`：「⋮」單本選單（含備註）與開網頁，資料夾頁與新增頁「最近加入」共用，不要各複製一份；`viewOptions.js`（純函式）算顯示備註／媽媽模式
 - `src/components/TagFilter.vue`：收藏頁標籤／作者／社團篩選（可打字＋勾選清單、右上角「全部清除」，顯示 `label || name`＝有翻譯就顯示翻譯；設定 `tag_show_original` 開啟時翻譯旁以灰色小字附註原文）；資料夾篩選用 `actionSheet` 的 `multi` 模式（勾選不關選單、標題列右邊「全部清除」）
 - `src/components/ModePicker.vue`：「篩選方式」小按鈕＋下拉選單（排除／包含任一／全部符合），標籤清單（`TagFilter`）與資料夾篩選選單（`actionSheet` 的 `multi.mode`）共用，不要各寫一份
-- `src/components/helpText.js`（純函式，有單元測試）：把 `locales.js` 的 `help`（純文字：`# 主題`、`- 條列`）解析成主題＋條列，由 `ui.js` 的 `helpDialog` 顯示（設定頁最上方的「使用說明」）；改說明內容只改 `locales.js` 四種語言，主題數與每個主題的條數要一致（`tests/help-text.test.js` 會檢查）
+- `src/components/helpText.js`（純函式，有單元測試）：把 `locales.js` 的 `help`（純文字：`# 主題`、`## 粗體小標`、`- 條列`）解析成主題 → 小標 → 條列，由 `ui.js` 的 `helpDialog` 顯示（設定頁最上方的「使用說明」）；改說明內容只改 `locales.js` 四種語言。寫法規則（`tests/help-text.test.js` 會檢查）：每個主題的內容都要先有 `##` 小標（一個問題或一句簡單的功能描述）、底下才是 `-` 條列，不可只有條列；四種語言的主題數、小標數、每個小標的條數要一致；提到 App 的頁面一律寫成「新增」頁面／「資料夾」頁面／「設定」頁面（不寫「分頁」，也不寫「設定 → 分享」這種箭頭寫法）
 - `src/components/folderRows.js`（純函式）：資料夾顯示名稱 `folderLabel`、書的資料夾文字 `bookFolderLabels`、所有資料夾清單的列 `buildFolderRows`（含系統資料夾、分隔線、拖曳／⋯）；**所有列出資料夾的地方都用它**
 - `src/components/folderManager.js`：「管理資料夾」畫面（`openFolderManager`）與資料夾／分隔線的改名、刪除選單（`openFolderItemMenu`），設定頁與收藏頁資料夾篩選共用，不要各寫一份
 - `src/services/library.js`：服務層入口，唯一碰 SQLite 與檔案的地方；背景佇列（meta／cover 兩個工作者）、快速分享收件匣（`drainQuickShares`／`pushQuickShareConfig`）、標籤翻譯更新（`updateTagTranslations`）、背景下載服務的啟停（`syncBgService`／`setAppActive`／`setBgSyncEnabled`／`nudgeQueue`）也在這裡。服務層不 import i18n：語言與提示文字由介面傳入（`setTagLang`、`setShareLabels`、`setBgSyncLabels`）

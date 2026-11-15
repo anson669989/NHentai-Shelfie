@@ -53,9 +53,9 @@ export const confirmDialog = (message, { okText, danger = false } = {}) =>
 export const alertDialog = (message, { title, diagnostics } = {}) => open('alert', { message, title, diagnostics })
 
 /**
- * 使用說明：每個主題一列，點標題展開條列內容。內容由 components/helpText.js 的 parseHelp 解析而來（純文字）。
+ * 使用說明：每個主題一列，點標題展開內容（粗體小標＋底下的條列）。內容由 components/helpText.js 的 parseHelp 解析而來（純文字）。
  * @param {string} title
- * @param {{intro?:string[], sections:{title:string, items:string[]}[], footer?:string[]}} content
+ * @param {{intro?:string[], sections:{title:string, groups:{lead:string, items:string[]}[]}[], footer?:string[]}} content
  */
 export const helpDialog = (title, { intro = [], sections = [], footer = [] } = {}) =>
   open('help', { title, intro, sections, footer, opened: {} })

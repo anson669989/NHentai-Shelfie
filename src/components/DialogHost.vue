@@ -126,7 +126,7 @@
         </button>
       </div>
 
-      <!-- 使用說明：每個主題一列，點標題展開條列內容（可同時展開多個） -->
+      <!-- 使用說明：每個主題一列，點標題展開內容（可同時展開多個） -->
       <div v-else-if="d.kind === 'help'" class="sheet help-sheet">
         <div class="sheet-head">
           <h3 class="help-title">{{ d.title }}</h3>
@@ -138,9 +138,15 @@
               <span class="help-sec-title">{{ s.title }}</span>
               <span class="help-caret" aria-hidden="true">›</span>
             </button>
-            <ul v-if="d.opened[i]" class="help-list">
-              <li v-for="(item, k) in s.items" :key="k">{{ item }}</li>
-            </ul>
+            <!-- 內容：粗體小標（一個問題或一句功能描述）＋底下的條列 -->
+            <div v-if="d.opened[i]" class="help-content">
+              <div v-for="(g, k) in s.groups" :key="k" class="help-group">
+                <p v-if="g.lead" class="help-lead">{{ g.lead }}</p>
+                <ul class="help-list">
+                  <li v-for="(item, n) in g.items" :key="n">{{ item }}</li>
+                </ul>
+              </div>
+            </div>
           </section>
           <p v-for="(line, i) in d.footer" :key="'f' + i" class="help-foot">{{ line }}</p>
         </div>
