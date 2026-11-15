@@ -20,6 +20,7 @@ import {
   sniffImageExt,
 } from './parse.js'
 import { settings, DEFAULT_ENDPOINTS } from './settings.js'
+import { pickSleep } from './bgSync.js'
 
 const DETAIL_TIMEOUT = 10_000
 const WEBVIEW_TIMEOUT = 20_000 // 不含原生端等待 challenge 自動通過的 15 秒
@@ -79,7 +80,32 @@ function log(entry) {
 }
 
 // ---------- 節流（兩條隊伍） ----------
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const timerSleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const MAX_NATIVE_DELAY = 60_000 // 外掛 delay 的上限（Java 端也會夾）
+
+/**
+ * 節流等待。App 在背景（背景下載）時網頁的 setTimeout 可能被系統放慢到每分鐘一次，
+ * 所以原生平台且網頁不在畫面上時改用外掛的原生計時（delay）；外掛失敗就退回 setTimeout。
+ * 間隔秒數不變，只是換一種等的方式（規則 6）。
+ * 另以「ms＋60 秒」的 setTimeout 當保險：萬一原生回呼沒回來，隊伍也不會永遠卡住。
+ */
+async function sleep(ms) {
+  const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
+  if (pickSleep({ native: Capacitor.isNativePlatform?.() === true, hidden }) === 'native') {
+    try {
+      let left = Math.max(0, ms)
+      do {
+        const step = Math.min(left, MAX_NATIVE_DELAY)
+        await Promise.race([NhWebFetch.delay({ ms: step }), timerSleep(step + 60_000)])
+        left -= step
+      } while (left > 0)
+      return
+    } catch {
+      /* 外掛不支援或失敗 → 用 setTimeout */
+    }
+  }
+  return timerSleep(ms)
+}
 
 /**
  * 建立一條節流隊伍：同時只跑 1 個工作、相鄰工作間隔至少 interval；收到 429 時整條隊伍暫停到 blockedUntil。
@@ -627,7 +653,7 @@ export async function downloadCover(galleryId, meta, cachePath, { diagnose = fal
             connectTimeout: COVER_TIMEOUT,
             readTimeout: COVER_TIMEOUT,
           }),
-          sleep(COVER_TIMEOUT + 2000).then(() => {
+          timerSleep(COVER_TIMEOUT + 2000).then(() => {
             throw new AppError(E.TIMEOUT)
           }),
         ])
@@ -774,6 +800,84 @@ export async function ackQuickShares(ids) {
 export async function onQuickShareReceived(cb) {
   try {
     return await NhWebFetch.addListener('quickShareReceived', () => cb())
+  } catch {
+    return null
+  }
+}
+
+// ---------- 背景下載（前景服務 SyncService＋通知） ----------
+// 服務只讓 App 不被系統停掉並顯示進度通知，不做網路、不碰資料庫；抓資料仍是 library 的佇列。
+// 外掛不存在（npm run dev）或失敗時安靜回傳預設值：權限 false、啟動 false、其餘不做事。
+
+/** 通知權限：API 32 以下一律 true；33+ 要有 POST_NOTIFICATIONS 且通知沒被關 */
+export async function getNotificationPermission() {
+  try {
+    return (await NhWebFetch.getNotificationPermission())?.granted === true
+  } catch {
+    return false
+  }
+}
+
+/** 請求通知權限（API 33+ 跳系統視窗）；回傳是否已允許 */
+export async function requestNotificationPermission() {
+  try {
+    return (await NhWebFetch.requestNotificationPermission())?.granted === true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 啟動服務並顯示通知（只在 App 於前景時呼叫）。
+ * @param {{title:string, text:string, stopLabel:string, channelName:string}} labels
+ * @returns {Promise<boolean>} 是否成功；失敗（BG_SYNC_FAILED、非 Android）回 false，不丟錯
+ */
+export async function startBgSync(labels) {
+  if (!Capacitor.isNativePlatform?.()) return false
+  try {
+    await NhWebFetch.startBgSync({
+      title: labels?.title || '',
+      text: labels?.text || '',
+      stopLabel: labels?.stopLabel || '',
+      channelName: labels?.channelName || '',
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** 更新通知文字（服務沒在跑時外掛不做事） */
+export async function updateBgSync(text) {
+  try {
+    await NhWebFetch.updateBgSync({ text: String(text ?? '') })
+  } catch {
+    /* 外掛不存在 */
+  }
+}
+
+/** 停止服務並移除通知；paused 為 true 時另留一則「已暫停」通知（文字＝text） */
+export async function stopBgSync({ paused = false, text = '' } = {}) {
+  try {
+    await NhWebFetch.stopBgSync({ paused: !!paused, text: String(text ?? '') })
+  } catch {
+    /* 外掛不存在 */
+  }
+}
+
+/** 清掉「已暫停」通知 */
+export async function clearBgSyncNotice() {
+  try {
+    await NhWebFetch.clearBgSyncNotice()
+  } catch {
+    /* 外掛不存在 */
+  }
+}
+
+/** 服務自己停下時 cb(reason)：'user'（按通知的停止）／'timeout'（6 小時到期）／'failed'（進不了前景狀態） */
+export async function onBgSyncStopped(cb) {
+  try {
+    return await NhWebFetch.addListener('bgSyncStopped', (e) => cb(typeof e?.reason === 'string' ? e.reason : 'failed'))
   } catch {
     return null
   }

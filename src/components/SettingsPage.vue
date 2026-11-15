@@ -209,6 +209,18 @@
           <span class="muted small">{{ lastExportText }}</span>
           <span v-if="exportOverdue" class="notice warn small">{{ t('settings.exportReminder') }}</span>
         </div>
+        <!-- 背景下載（預設關閉）：需要通知權限；權限被收回時開關保持原樣，只在下方顯示紅字 -->
+        <div class="row">
+          <div class="row-text">
+            <span>{{ t('settings.bgSync') }}</span>
+            <span class="muted small">{{ t('settings.bgSyncHint') }}</span>
+            <span v-if="bgSyncNoPerm" class="field-error">{{ t('settings.bgSyncNoPerm') }}</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" :checked="on('bg_sync')" :disabled="bgSyncBusy" @change="flipBgSync($event)" />
+            <span class="switch-track" />
+          </label>
+        </div>
         <div v-if="pendingCount > 0 || queueRunning" class="row">
           <span>{{ t('settings.pending', { n: pendingCount }) }}</span>
           <button class="btn" :disabled="queueRunning" @click="resumeQueue">
@@ -324,7 +336,12 @@ import {
   updateTagTranslations,
   tagTranslationState,
   dataVersion,
+  bgSyncState,
+  bgSyncPermission,
+  requestBgSyncPermission,
+  setBgSyncEnabled,
 } from '../services/library.js'
+import { estimateSyncMinutes } from '../services/bgSync.js'
 import { resolveAutoFolders } from '../services/quickShare.js'
 import { tagDataset, tagtrKeys } from '../services/tagTranslation.js'
 import { hasLayoutMeta } from '../services/csv.js'
@@ -389,6 +406,37 @@ async function flipTagTranslate(ev) {
 }
 function updateTagTr() {
   updateTagTranslations({ force: true }).catch(() => {}) // 失敗訊息顯示在狀態列（tagTranslationState.error）
+}
+
+// ---- 背景下載（bg_sync）：打開時先確認通知權限，沒有就請求；仍沒有就彈回並說明 ----
+const bgSyncBusy = ref(false)
+/** 開關開著但通知權限已在系統設定被收回：不改設定、不主動跳視窗，只顯示紅字 */
+const bgSyncNoPerm = computed(() => on('bg_sync') && bgSyncState.checked && !bgSyncState.permission)
+/** 背景下載實際有作用（開關開著且有通知權限）：匯入提醒依此擇一 */
+const bgSyncActive = computed(() => on('bg_sync') && bgSyncState.permission)
+async function flipBgSync(ev) {
+  const el = ev.target
+  const want = el.checked
+  bgSyncBusy.value = true
+  try {
+    if (!want) {
+      await setBgSyncEnabled(false)
+      return
+    }
+    let granted = await bgSyncPermission()
+    if (!granted) granted = await requestBgSyncPermission()
+    if (!granted) {
+      el.checked = false
+      await alertDialog(t('settings.bgSyncDenied'))
+      return
+    }
+    await setBgSyncEnabled(true)
+  } catch (err) {
+    el.checked = on('bg_sync')
+    toast(errText(toAppError(err)))
+  } finally {
+    bgSyncBusy.value = false
+  }
 }
 
 // ---- 分享：直接收藏時自動加入的資料夾 ----
@@ -493,9 +541,15 @@ async function doImport(ev) {
       .join('\n')
     // CSV v2 的中繼列（資料夾順序、分隔線、分享設定）：有的話預覽多一句說明，沒有新書也能按「匯入」還原
     const withLayout = hasLayoutMeta(res.meta)
+    // 有新書時說明「書名與封面怎麼補上」：預估分鐘數（含原本還沒抓完的）＋要開著 App 或已開背景下載
+    const syncNote = res.ok.length
+      ? `\n\n${t('import.syncEta', { min: estimateSyncMinutes(res.ok.length + pendingCount.value) })}\n` +
+        t(bgSyncActive.value ? 'import.syncHintOn' : 'import.syncHintOff')
+      : ''
     const msg =
       t('import.preview', { ok: res.ok.length, skip: res.skipped.length }) +
       (withLayout ? `\n${t('import.layout')}` : '') +
+      syncNote +
       (res.skipped.length ? `\n\n${t('import.reasons')}\n${reasons}${res.skipped.length > 20 ? '\n…' : ''}` : '')
     if (!res.ok.length && !withLayout) {
       await alertDialog(msg)

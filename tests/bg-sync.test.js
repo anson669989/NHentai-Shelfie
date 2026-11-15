@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planBgSync, estimateSyncMinutes, fillCount } from '../src/services/bgSync.js'
+import { planBgSync, estimateSyncMinutes, fillCount, pickSleep } from '../src/services/bgSync.js'
 
 // 預設：開關開著、在前景、服務沒在跑、還有 10 本、工作者在跑、沒有要處理的事
 const base = { enabled: true, active: true, serviceOn: false, pending: 10, running: true, waiting: false, halted: false }
@@ -87,6 +87,19 @@ describe('estimateSyncMinutes（每本 3 秒）', () => {
     expect(estimateSyncMinutes(NaN)).toBe(0)
     expect(estimateSyncMinutes(undefined)).toBe(0)
     expect(estimateSyncMinutes(Infinity)).toBe(0)
+  })
+})
+
+describe('pickSleep（2.6：背景時改用原生計時）', () => {
+  it('原生平台且網頁不在畫面上 → native', () => {
+    expect(pickSleep({ native: true, hidden: true })).toBe('native')
+  })
+  it('其他情況 → timer', () => {
+    expect(pickSleep({ native: true, hidden: false })).toBe('timer')
+    expect(pickSleep({ native: false, hidden: true })).toBe('timer')
+    expect(pickSleep({ native: false, hidden: false })).toBe('timer')
+    expect(pickSleep({})).toBe('timer')
+    expect(pickSleep()).toBe('timer')
   })
 })
 

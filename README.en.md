@@ -44,6 +44,7 @@
 - **Four languages**: 繁體中文, 简体中文, English, 日本語
 - **Choose how links open**: external browser or in-app browser
 - **Export backup**: export to CSV and import it on a new phone in one step (folder order, dividers, Unread / Favorites and sharing settings come along too)
+- **Background download (optional)**: keeps fetching titles and covers while you use other apps or the screen is off, with progress in a notification
 
 
 ## 📱 Screenshots
@@ -87,6 +88,18 @@ Your list, folders and covers are stored in the app's private storage on this ph
 <summary><b>How do I move to a new phone?</b></summary>
 
 Old phone: Settings → Data → Export CSV, then save it to cloud storage or send it to yourself. New phone: install the app, then Settings → Data → Import CSV. Folders (including their order and dividers), Unread / Favorites and sharing settings are restored, and titles and covers are downloaded again automatically.
+</details>
+
+<details>
+<summary><b>I imported a lot of books. How long until titles and covers show up? Can I use my phone meanwhile?</b></summary>
+
+The site allows at most 20 lookups a minute, so 1,000 books take about 50 minutes (the confirmation before importing shows an estimate). By default fetching only continues while the app is on screen; it pauses when you switch apps or turn the screen off, and resumes next time you open the app.
+
+To keep going while you use your phone, turn on **Background download** in Settings → Data (off by default):
+- It needs **notification** permission for NH Shelfie. The notification only says "Syncing / N left" — no titles, covers or IDs — and is hidden on the lock screen. It disappears when everything is done.
+- It is not faster, and Android lets it run for about 6 hours a day at most.
+- "Stop" on the notification only stops this run; fetching continues when you return to the app.
+- Battery savers on some phone brands may still stop it; the app picks up where it left off next time you open it.
 </details>
 
 ## 🔐 Privacy

@@ -44,6 +44,16 @@ export function estimateSyncMinutes(n) {
 }
 
 /**
+ * 節流等待要用哪種計時（2.6）：原生平台且網頁不在畫面上（背景時網頁的 setTimeout 可能被系統放慢）
+ * → 'native'（外掛的 delay，原生計時）；其他情況 → 'timer'（setTimeout）。
+ * @param {{native?: boolean, hidden?: boolean}} env
+ * @returns {'native'|'timer'}
+ */
+export function pickSleep(env) {
+  return env?.native && env?.hidden ? 'native' : 'timer'
+}
+
+/**
  * 把範本裡的 {n} 換成數字（服務層不 import i18n，通知文字範本由介面傳入）。
  * @param {string} template
  * @param {number} n

@@ -1,7 +1,7 @@
 # 2026-11 背景下載（前景服務＋通知）與匯入時的同步提醒
 
 > 建立：2026-11-15　·　目標版本：併入 v0.4.0（v0.4.0 尚未推標籤；`package.json` 版本號不用改）
-> 狀態：**階段 A、B 完成**（B 待 GitHub Actions 確認編譯）。本文件由規劃者撰寫，交給另一位執行者依序實作。
+> 狀態：**階段 A–E 完成，待實機驗收**（第 5 節）。本文件由規劃者撰寫，交給另一位執行者依序實作。
 > 執行者沒有規劃時的對話內容，所有需要的背景都寫在這份文件裡。
 
 ---
@@ -286,9 +286,15 @@ WebView 不在畫面上時，系統可能把網頁的 `setTimeout` 放慢（最�
 
 ### 階段 C：服務層串接
 
-- [ ] `nhSource.js`：包裝外掛方法、`sleep` 依 2.6 修改（`pickSleep` 抽出並加測試，放進 `tests/bg-sync.test.js` 或既有合適的測試檔）
-- [ ] `library.js`：`setBgSyncLabels`、`setAppActive`、`syncBgService`、`nudgeQueue`、`onBgSyncStopped` 註冊、權限查詢與請求的包裝（給設定頁用：例 `bgSyncPermission()`、`requestBgSyncPermission()`、`clearBgSyncNotice()`）、更新註解（2.9）
-- [ ] `App.vue`：`appStateChange` 改用 `setAppActive`；啟動與語言改變時推通知文字；回到前景清「已暫停」通知；`onDrained` 依 2.5 修改
+- [x] `nhSource.js`：包裝外掛方法、`sleep` 依 2.6 修改（`pickSleep` 抽出並加測試，放進 `tests/bg-sync.test.js` 或既有合適的測試檔）
+- [x] `library.js`：`setBgSyncLabels`、`setAppActive`、`syncBgService`、`nudgeQueue`、`onBgSyncStopped` 註冊、權限查詢與請求的包裝（給設定頁用：例 `bgSyncPermission()`、`requestBgSyncPermission()`、`clearBgSyncNotice()`）、更新註解（2.9）
+- [x] `App.vue`：`appStateChange` 改用 `setAppActive`；啟動與語言改變時推通知文字；回到前景清「已暫停」通知；`onDrained` 依 2.5 修改
+- 執行者補充（階段 C）：
+  - `pickSleep` 放在 `bgSync.js`；原生 `delay` 另以「ms＋60 秒」的 `setTimeout` 當保險，原生回呼沒回來時隊伍不會永遠卡住；封面下載的逾時計時（`Promise.race`）仍用 `setTimeout`
+  - 服務被停下（通知的「停止」、6 小時到期、啟動失敗、`failed`）後設 `bgSuppressed`，到下次「切到背景再回前景」前不自動重開（實作 2.8 補充的「只停這一次」，也避免啟動失敗時每本書重試）
+  - 保險：背景中服務開著、有待處理，但工作者沒在跑也沒在等超過約 1 分鐘（工作者意外結束）→ 停服務與佇列，不白白持有 WakeLock
+  - `App.vue` 的網路恢復（`online`）事件同樣修正：背景時不呼叫 `runQueue()`，改呼叫 `nudgeQueue()`
+  - 設定頁用的 `bgSyncState = reactive({ permission, checked })`：每次回到前景重新查權限
 - 陷阱：
   - `stopQueue()` 之後佇列「目前這本做完才停」是既有行為，不要改。
   - `syncBgService()` 會被很頻繁地呼叫（每本書至少一次）：要序列化、文字沒變不送。
@@ -301,22 +307,22 @@ WebView 不在畫面上時，系統可能把網頁的 `setTimeout` 放慢（最�
 
 ### 階段 D：介面
 
-- [ ] `SettingsPage.vue`：「資料」卡片加背景下載開關與權限流程（2.10）
-- [ ] `SettingsPage.vue` 的 `doImport`：加入同步提醒（2.11）
+- [x] `SettingsPage.vue`：「資料」卡片加背景下載開關與權限流程（2.10）
+- [x] `SettingsPage.vue` 的 `doImport`：加入同步提醒（2.11）
 - 陷阱：規則 4（純文字渲染，不用 v-html；`confirmDialog` 的訊息本來就是純文字＋換行）；規則 8（四語）。
 - 驗收：`npm test`、`npm run build` 通過；`npm run dev` 可看到開關與文字（桌面上權限一律視為沒有，開關會彈回並顯示說明——這是預期行為）。
 
 ### 階段 E：文件
 
-- [ ] `CLAUDE.md`：
+- [x] `CLAUDE.md`：
   - 規則 9 改成：權限為 `INTERNET`＋背景下載用的四個（列出名稱），都宣告在外掛 manifest；仍不新增其他權限
   - 規則 16 補一句：`SyncService` 只保活與顯示通知，不做網路、不碰資料庫
   - 架構一節：`bgSync.js`（純函式，列入「必須有單元測試」與 `npm test` 必跑清單）、nh-webfetch 的說明補上前景服務、通知權限與 `delay`
   - 「背景佇列只在前景執行」的幾處改成 2.1 的新說法；加一條：前景服務只能在 App 於前景時啟動
   - 「待實機驗收」加入本文件；「任務文件」一節指向本文件
-- [ ] `docs/DEVELOPMENT.md`：第 32、59、100、109 行附近（「只在前景執行」「只申請 INTERNET 權限」）與檔案清單（`bgSync.js`、`SyncService.java`）；設定頁功能表加「背景下載」
-- [ ] `README.md`／`README.en.md`：若有提到「要開著 App 才會抓」或權限的段落就更新；沒有就加一小段說明背景下載是選用功能、會用到通知權限
-- [ ] 全部完成後，把本文件狀態改成「階段 A–E 完成，待實機驗收」
+- [x] `docs/DEVELOPMENT.md`：第 32、59、100、109 行附近（「只在前景執行」「只申請 INTERNET 權限」）與檔案清單（`bgSync.js`、`SyncService.java`）；設定頁功能表加「背景下載」
+- [x] `README.md`／`README.en.md`：若有提到「要開著 App 才會抓」或權限的段落就更新；沒有就加一小段說明背景下載是選用功能、會用到通知權限
+- [x] 全部完成後，把本文件狀態改成「階段 A–E 完成，待實機驗收」
 
 ---
 

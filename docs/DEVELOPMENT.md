@@ -10,7 +10,7 @@ Capacitor + Vue 3 的 Android App：輸入 gallery ID，在背景抓書名與封
 | --- | --- |
 | 資料夾 | 上方兩列搜尋與篩選：第一列「標籤／作者／社團」（可打字、勾選，多選為「且」；清單右上角「全部清除」）＋排序；第二列「作品名稱／備註／ID」文字搜尋（停止輸入 300 ms 後查詢）＋資料夾篩選（多選為「或」，「全部」「未分類」「未讀」「⭐ 典藏」固定在最上方；自建資料夾與分隔線按住 ≡ 拖曳排序、⋯ 改名／刪除；最下方「＋ 新增資料夾」與「⚙ 管理資料夾」；右上角「全部清除」回到「全部」）；標籤翻譯開啟時，標籤清單顯示目前介面語言的翻譯名稱（中文或日文），打原文或翻譯都搜得到；有篩選時顯示「找到 N 本」與「清除全部篩選」；封面牆（虛擬捲動，可調 2–5 欄），封面下方固定兩行書名（可再多一行備註）、左下角 ID；每個資料夾各自記住排序（多選資料夾時用「全部」的排序）；點封面依「開啟網頁方式」以系統瀏覽器或 Custom Tab 開網頁；封面右上角「⋮」單本選單（完整英／日標題、單行備註、複製 ID、📁 分類（勾選即存）、從此資料夾移除、刪除；找不到的書可「修改 ID」；選單右上角灰色重新載入圖示＝重新查詢並更新標籤與封面）；長按封面進入多選模式（全選只選目前篩選結果、批次分類／移除／刪除，返回鍵退出）；佔位圖依狀態顯示「載入中／找不到這本／資料讀取失敗／封面失敗」 |
 | 新增 | 「先存、後查」：輸入 ID（純數字、`#228922`、全形＃、網址）→ 按「加入」只做本機動作（不發網路請求）→ 輸入框立刻清空；已在所選資料夾就提示、已收藏就只補資料夾（不會重新加進未讀）；資料夾記住上次的選擇（勾選即存；預設只勾「未讀」，右邊灰色圖示可恢復預設）；下方「最近加入」清單（10–50 筆可設定）顯示所在資料夾、隨背景補資料自動更新，點整條開網頁、長按開「⋮」單本選單；從瀏覽器「分享」進來（「開 App 選資料夾」模式）會自動填入 ID；直接收藏的書在打開 App 時寫入並提示「已加入剛才分享的 N 本」 |
-| 設定 | 主題顏色、深淺色、語言（繁中／简中／English／日本語）、使用說明；開啟網頁方式（外部瀏覽器／App 內瀏覽器）；分享（開 App 選資料夾／直接收藏，直接收藏時自動加入的資料夾）；資料夾（管理資料夾：拖曳排序、改名、刪除、新增分隔線）；標籤翻譯（開關、狀態、立即更新、來源與授權）；在封面下方顯示備註、最近加入顯示筆數；媽媽模式（套用頁面：收藏頁／最近加入；隱藏內容：封面換成固定淺灰方塊且不載入圖片、書名、備註；詳細設定預設收合）；CSV 匯出／匯入（換機用，v2 格式含資料夾順序、分隔線、未讀／典藏、分享設定）、背景佇列、重抓缺少的封面、封面占用空間、清除封面快取（只清暫存，收藏的封面不刪）；進階：測試連線；連點「關於 → 版本」7 次開啟開發者模式，可修改站方端點、看最近 50 次抓取成功率、切換抓取方式、重設驗證 |
+| 設定 | 主題顏色、深淺色、語言（繁中／简中／English／日本語）、使用說明；開啟網頁方式（外部瀏覽器／App 內瀏覽器）；分享（開 App 選資料夾／直接收藏，直接收藏時自動加入的資料夾）；資料夾（管理資料夾：拖曳排序、改名、刪除、新增分隔線）；標籤翻譯（開關、狀態、立即更新、來源與授權）；在封面下方顯示備註、最近加入顯示筆數；媽媽模式（套用頁面：收藏頁／最近加入；隱藏內容：封面換成固定淺灰方塊且不載入圖片、書名、備註；詳細設定預設收合）；CSV 匯出／匯入（換機用，v2 格式含資料夾順序、分隔線、未讀／典藏、分享設定；匯入前的確認視窗附預估時間與同步方式說明）、背景下載（選用，前景服務＋通知，需要通知權限）、背景佇列、重抓缺少的封面、封面占用空間、清除封面快取（只清暫存，收藏的封面不刪）；進階：測試連線；連點「關於 → 版本」7 次開啟開發者模式，可修改站方端點、看最近 50 次抓取成功率、切換抓取方式、重設驗證 |
 | 驗證畫面 | 站方開啟 Cloudflare 安全驗證時，App 會先在背景 WebView 自動嘗試；過不了才在提示列出現「進行驗證」按鈕，開啟全螢幕驗證畫面讓你手動完成，通過後背景佇列自動續跑 |
 
 ## 資料來源：nhentai API v2
@@ -29,8 +29,35 @@ App 直接向站方的公開 API v2 取資料，不經任何自建伺服器、�
    - **meta 工作者**（API 隊伍）：`meta_pending` → 抓詳情 → 單一交易寫 `books` 書名與 `book_raw` → `cover_pending`；404 → `not_found`；格式不符 → `meta_failed`。
    - **cover 工作者**（圖片隊伍）：`cover_pending` → 用本機 `book_raw` 組封面網址 → 下載 → 搬進 `covers/`（新檔名）→ 更新資料庫 → `ok`；封面失敗 → `no_cover`。
    - 離線／逾時／被擋：不算失敗，留在佇列 30 秒後自動重試；429：該隊伍暫停到 `Retry-After`（預設 30 秒）後自動續跑，畫面顯示「請求太頻繁，稍後自動重試」；需要驗證：暫停並顯示「進行驗證」。
-   - 只在前景執行：切到背景就停，回到前景或網路恢復（`online` 事件）自動續跑。
+   - 預設只在前景執行：切到背景就停，回到前景或網路恢復（`online` 事件）自動續跑。設定「背景下載」（`bg_sync`）開啟且前景服務正在跑時，背景也繼續（見下一節）。
 3. 節流分兩條獨立隊伍（[`nhSource.js`](../src/services/nhSource.js) 的 `makeLane`）：API（詳情、`/api/v2/cdn`、驗證畫面，≥ 3 秒）與圖片（t1–t4，≥ 1 秒），封面下載不會卡住下一本的查詢。不可在某條隊伍的工作內再呼叫排進同一條隊伍的函式。
+
+## 背景下載（前景服務＋通知，選用）
+
+設定頁「資料 → 背景下載」（`bg_sync`，預設 `'0'`，不列入 CSV 備份）。開啟後切到別的 App 或關螢幕也繼續補書名與封面，通知列顯示「同步中／還有 N 本」（不放書名、封面、ID；鎖定畫面不顯示），抓完通知自動消失。規格見 [`docs/tasks/2026-11-background-download.md`](tasks/2026-11-background-download.md)。
+
+```
+設定頁開關 ─▶ library.setBgSyncEnabled        App.vue appStateChange ─▶ library.setAppActive
+佇列狀態改變（pendingCount／queueRunning／challenge／error，Vue watch）＋ retryLater
+            ▼
+library.syncBgService（序列化、文字沒變不重送）── bgSync.js 的 planBgSync 決定 start／update／done／paused／stop
+            ▼
+nhSource.js：startBgSync／updateBgSync／stopBgSync／clearBgSyncNotice（唯一 import 外掛的地方）
+            ▼
+NhWebFetchPlugin.java ─▶ SyncService.java（前景服務 dataSync＋通知＋WakeLock）
+            ▲
+            └── 使用者按通知的「停止」、6 小時到期、進不了前景狀態 ─▶ 事件 bgSyncStopped
+```
+
+- **服務只保活與顯示通知**，不做網路、不碰資料庫；抓資料仍是 JS 的佇列與兩條節流隊伍（速度不變）。
+- **前景服務只能在 App 於前景時啟動**（Android 12 起背景不能啟動前景服務）：`planBgSync` 只在 `active` 時回 `start`。所以開關開著、有東西在抓時，App 開在畫面上也會有通知。
+- 切到背景：服務在跑就不停佇列；否則 `stopQueue()`（和以前一樣）。背景中服務停了（抓完、要使用者處理、按停止、6 小時到期）就一併停佇列。
+- 背景中遇到 Cloudflare 驗證或寫檔／空間／資料庫錯誤：停服務，留一則可滑掉的「同步已暫停，請開啟 App 查看」通知，回到 App 時清掉。
+- 通知的「停止」只停這一次（不改設定）：到下次「切到背景再回前景」前不自動重開；啟動失敗、6 小時到期也一樣。
+- 背景時網頁的 `setTimeout` 可能被放慢：節流等待（`nhSource.js` 的 `sleep`）在原生平台且網頁不在畫面上時改用外掛的 `delay`（原生計時，`pickSleep` 決定），失敗就退回 `setTimeout`。30 秒以上的重試計時維持 `setTimeout`。
+- 權限（都宣告在外掛 manifest）：`FOREGROUND_SERVICE`、`FOREGROUND_SERVICE_DATA_SYNC`、`POST_NOTIFICATIONS`（Android 13 起會跳視窗，不允許就不能開）、`WAKE_LOCK`。通知權限被收回時開關保持原樣、視同未啟用，設定頁顯示紅字。
+- Android 15 起 `dataSync` 每 24 小時最多約 6 小時（`onTimeout` 時立刻停）；部分品牌的省電機制仍可能砍掉 App，下次開 App 會從資料庫接著抓。
+- App 在背景、背景下載沒在跑時收到直接收藏：只寫進資料庫、不連網，回到前景才開始抓並補顯示「已加入剛才分享的 N 本」。
 
 ## 從瀏覽器「分享」加入（兩種模式）
 
@@ -56,7 +83,7 @@ App 啟動／回到前景／收到事件 → library.drainQuickShares（JS）
 - 快照與提示文字由 `library.pushQuickShareConfig` 整份重推：啟動、新增／刪除書、改 ID、CSV 匯入、處理收件匣之後、切換分享模式或語言時。快照可能慢一步，最壞只是提示不準一次；真正寫入時 JS 會再查資料庫，已收藏的書完全不動。CSV 匯出前也會先處理收件匣。
 - ID 規則：直接收藏只認 nhentai 網址（`https://nhentai.net/g/數字/`，含子網域；開發者模式改過「開啟網頁」端點時也認那個網域，`shareHosts`），純數字與 `#123456` 不算。規則在 `parse.js` 的 `extractNhGalleryId` 與 `QuickShareStore.java` 的 `extractId` 各一份，要同步。「開 App 選資料夾」模式沿用 `extractGalleryId`（`/g/{id}`、`#123456` 或整段數字，取第一個）。
 - 自動加入的資料夾（`share_auto_folders`，純函式 `resolveAutoFolders`）：空字串＝還沒設定＝只有「未讀」；`'[]'`＝都不加；以**打開 App 處理當下**的設定為準。
-- 書名與封面要等下次打開 App 才補（背景佇列只在前景執行）。不新增權限、不加背景服務。
+- App 在背景時收到的直接收藏：只寫進資料庫（純本機），書名與封面等回到 App 才補；背景下載正在跑時則直接排進去一起抓。提示「已加入剛才分享的 N 本」在回到前景時一次顯示。
 
 ## 搜尋與篩選（schema v3）
 
@@ -97,7 +124,7 @@ App 啟動／回到前景／收到事件 → library.drainQuickShares（JS）
 - **不留半套資料**：新書與資料夾關聯一個交易寫入；詳情與 `book_raw` 一個交易寫入；封面先存檔再更新資料庫，失敗或書已被刪就刪檔。啟動時清掉孤兒封面檔。
 - **資料模型**：SQLite（`books`、`book_raw`、`folders`、`folder_separators`、`book_folders`、`tags`、`book_tags`、`tag_translations`、`tag_translations_ja`、`settings`、`fetch_log`），`raw_json` 獨立存放並以 `raw_format` 標版本，可直接本地解析、不必重抓。schema 以 `PRAGMA user_version` 逐版遷移，遷移前自動備份。v2 新增 `books.queue_seq` 與新的 `fetch_status` 值（`meta_pending`、`cover_pending`、`not_found`、`meta_failed`），舊的 `pending` 自動轉換。v3 新增 `tags`、`book_tags`（`tag_id` 索引）與 `books.title_en`；刪除書時一併刪 `book_tags`。v4 新增 `folders.kind`（`user`／`unread`／`fav`，並插入兩列系統資料夾，`name` 是佔位字串 `::nhs-unread::`／`::nhs-fav::`，顯示一律經 `folderLabel`）、`folder_separators`（分隔線，和使用者資料夾共用 `sort_order`）與 `tag_translations`；v5 新增 `tag_translations_ja`。「未分類」＝沒有加入任何 `kind = 'user'` 的資料夾（未讀、典藏不算）。備註存在 `books.note`（⋮ 選單編輯，單行、不限長度），資料夾與分隔線的順序存在各自的 `sort_order`（`reorderFolderItems`：拖曳放開時一個交易全部更新，失敗回滾並還原畫面）。
 - **開啟網頁**：設定 `open_mode`：`external`（預設，本地外掛 `nh-webfetch` 的 `openExternal`，Java 端再檢查 https＋nhentai 網域）或 `custom_tab`。預設外部瀏覽器，是因為 MainActivity 是 `singleTask`，從 Custom Tab 分享回 App 時會把 Custom Tab 清掉。開不起來就複製連結。
-- **安全**：所有外部文字一律純文字渲染（不使用 `v-html`）；CSP 只允許自身腳本與本機圖片；只允許 HTTPS、請求只送往白名單網域——對外連線只有 nhentai（`nhSource.js`）與 GitHub 的兩個標籤翻譯儲存庫（`tagDbSource.js`，只在開啟標籤翻譯時），CSP `connect-src 'self'`、網路一律走原生 HTTP；ID 先轉整數再套範本，封面網址只接受 `*.nhentai.net` 的 CDN 伺服器與符合格式的 `cover.path`；封面以檔頭驗證 JPG／PNG／WebP、上限 5 MB；全部參數化查詢；CSV 匯出防公式注入；快速分享的原生端不碰 SQLite；只申請 `INTERNET` 權限；關閉 `allowBackup`；封面目錄放 `.nomedia`。
+- **安全**：所有外部文字一律純文字渲染（不使用 `v-html`）；CSP 只允許自身腳本與本機圖片；只允許 HTTPS、請求只送往白名單網域——對外連線只有 nhentai（`nhSource.js`）與 GitHub 的兩個標籤翻譯儲存庫（`tagDbSource.js`，只在開啟標籤翻譯時），CSP `connect-src 'self'`、網路一律走原生 HTTP；ID 先轉整數再套範本，封面網址只接受 `*.nhentai.net` 的 CDN 伺服器與符合格式的 `cover.path`；封面以檔頭驗證 JPG／PNG／WebP、上限 5 MB；全部參數化查詢；CSV 匯出防公式注入；快速分享與背景下載的原生端不碰 SQLite；權限只有 `INTERNET` 與背景下載用的四個（`FOREGROUND_SERVICE`、`FOREGROUND_SERVICE_DATA_SYNC`、`POST_NOTIFICATIONS`、`WAKE_LOCK`，宣告在外掛 manifest）；關閉 `allowBackup`；封面目錄放 `.nomedia`。
 - **Android 細節**：safe-area insets 處理 Android 15 edge-to-edge；返回鍵順序：關彈窗 → 收合標籤清單／退出多選 → 回資料夾頁 → 再按一次才離開。
 - **語言**：字串在 [`src/locales.js`](../src/locales.js)（繁中／简中／English／日本語），`tests/locales.test.js` 檢查四語鍵一致；手機語言 zh-CN／zh-Hans／zh-SG 自動用简中，zh-TW／zh-HK／zh-Hant 用繁中。
 
@@ -106,9 +133,9 @@ App 啟動／回到前景／收到事件 → library.drainQuickShares（JS）
 - 依賴站方 API v2：站方改格式或改限制時，書會顯示「資料讀取失敗」，需要更新 App（或在開發者模式改端點）。
 - 匿名每分鐘 20 次的限制下，大量加入或 CSV 匯入後補資料比較慢（每本約 3 秒；封面另走圖片隊伍）。
 - 站方若開啟 Cloudflare 驗證，需要在 App 內手動完成一次驗證畫面。
-- 背景佇列只在前景執行（不新增 Android 權限、不用背景服務）。
+- 背景佇列預設只在前景執行；要在背景繼續須開啟「背景下載」（需要通知權限，每天最多約 6 小時，部分品牌的省電機制仍可能中斷）。
 - 還在「待補資料」的書沒有標籤，補完資料後才搜得到；升級到 v3 後，舊資料的標籤在啟動後數秒內回填完成前，選項可能不完整。
-- 直接收藏的書要等下次打開 App 才寫進資料庫、補書名與封面。
+- 直接收藏的書：App 完全關閉時要等下次打開才寫進資料庫；App 在背景時會先寫進資料庫，但沒開背景下載就要回到 App 才補書名與封面。
 - 標籤翻譯依賴兩個外部儲存庫；日文來源很新，可能改格式或下架。純漢字的日文作者名會被簡轉繁成繁體字（無法區分）。
 - CSV：資料夾名稱含 `|` 時，匯出再匯入會被拆成兩個資料夾；主題、媽媽模式、標籤翻譯開關不在備份範圍。
 - 沒有桌面預覽：資料庫與檔案功能只在 Android 上運作。
@@ -170,7 +197,7 @@ git push origin v0.1.0
 
 ```bash
 npm install
-npm test                 # 單元測試（ID 解析、加入判斷、站方回應解析、標籤解析與篩選、CSV、資料夾排序、快速分享、標籤翻譯與下載、四語鍵一致、封面下載流程）
+npm test                 # 單元測試（ID 解析、加入判斷、站方回應解析、標籤解析與篩選、CSV、資料夾排序、快速分享、標籤翻譯與下載、背景下載的啟停判斷、四語鍵一致、封面下載流程）
 npm run android:prepare  # 建置網頁 → 產生 android/ → 套用設定 → 同步
 npm run android:open     # 用 Android Studio 開啟，接手機執行
 ```
@@ -185,11 +212,13 @@ npm run android:open     # 用 Android Studio 開啟，接手機執行
 .github/workflows/build-apk.yml  建置與發佈 APK
 scripts/patch-android.mjs        對產生的 Android 專案套用設定
 plugins/nh-webfetch/             本地 Capacitor 外掛（Java）：WebView 驗證抓取、接收分享（ShareReceiverActivity、
-                                 QuickShareStore 收件匣）、以系統瀏覽器開網頁、鍵盤高度
+                                 QuickShareStore 收件匣）、以系統瀏覽器開網頁、鍵盤高度、
+                                 背景下載（SyncService 前景服務＋通知、通知權限、原生計時 delay）
 capacitor.config.json            App ID、名稱、外掛設定
 index.html                       含 CSP
 src/
-  App.vue                        底部三格導覽、返回鍵、前景佇列、接收分享、處理快速分享收件匣、傳介面語言給服務層
+  App.vue                        底部三格導覽、返回鍵、前景／背景切換（setAppActive）、接收分享、處理快速分享收件匣、
+                                 傳介面語言與通知文字給服務層
   viewport.js                    鍵盤高度 → CSS 變數（對話框浮到鍵盤上方）
   components/
     FoldersPage.vue              資料夾頁（搜尋與篩選、多選模式、⋮ 單本選單）
@@ -208,16 +237,16 @@ src/
   services/                      服務層（唯一碰資料庫、檔案與網路的地方）
     nhSource.js                  站方轉接層：請求、兩條節流隊伍、解析、封面下載、分享文字；唯一 import nh-webfetch
     tagDbSource.js               標籤翻譯資料下載（唯一對 GitHub 發請求的地方）
-    library.js                   書籍／資料夾／分隔線／背景佇列／快速分享收件匣／標籤翻譯更新／CSV／健康檢查
+    library.js                   書籍／資料夾／分隔線／背景佇列／背景下載服務的啟停／快速分享收件匣／標籤翻譯更新／CSV／健康檢查
     db.js                        SQLite 連線與 schema 遷移
     settings.js                  設定鍵值與預設端點
     parse.js / csv.js / errors.js / addPlan.js / filter.js / settingsMigration.js /
-    folderOrder.js / quickShare.js / tagTranslation.js        純函式（可單元測試）
+    folderOrder.js / quickShare.js / tagTranslation.js / bgSync.js   純函式（可單元測試）
     zhConvert.js                 簡 → 繁（opencc-js，動態載入）
   locales.js                     繁中／简中／英／日字串（純資料）
   i18n.js                        t()／errText()／語言偵測
 tests/                           Vitest 單元測試
-docs/tasks/                      任務文件（目前：2026-11-update.md；archive/ 是已完成的舊任務，只供參考）
+docs/tasks/                      任務文件（目前：2026-11-update.md、2026-11-background-download.md；archive/ 是已完成的舊任務，只供參考）
 ```
 
 ## 用 Claude Code 維護

@@ -1,5 +1,5 @@
 // 服務層：介面只和這裡講話；這裡是唯一碰資料庫、檔案與網路（經 nhSource）的地方。
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
@@ -37,6 +37,7 @@ import {
 import { fetchTagDbVersion, downloadTagDb } from './tagDbSource.js'
 import { loadCnToTw } from './zhConvert.js'
 import { loadSettings, migrateSettings, setSetting, settings } from './settings.js'
+import { planBgSync, fillCount } from './bgSync.js'
 import {
   RAW_FORMAT,
   fetchDetail,
@@ -55,6 +56,13 @@ import {
   peekQuickShares,
   ackQuickShares,
   onQuickShareReceived,
+  getNotificationPermission,
+  requestNotificationPermission,
+  startBgSync,
+  updateBgSync,
+  stopBgSync,
+  clearBgSyncNotice as clearBgSyncNoticeNative,
+  onBgSyncStopped,
 } from './nhSource.js'
 
 const COVERS_DIR = 'covers'
@@ -105,6 +113,11 @@ export async function initLibrary() {
   await clearPreviewCache()
   await cleanupOrphanCovers().catch((e) => console.warn('orphan cleanup failed', e))
   await refreshPendingCount()
+  // 背景下載：註冊服務停下的事件、查一次通知權限（都不擋啟動）
+  onBgSyncStopped(handleBgSyncStopped).catch(() => {})
+  refreshBgSyncPermission()
+    .catch(() => {})
+    .finally(() => syncBgService())
   backfillTags().catch((e) => console.warn('tag backfill failed', e)) // 不擋啟動，前景分批做
   maybeUpdateTagTranslations() // 不擋啟動；開關開啟且滿 24 小時才會連線
 }
@@ -892,7 +905,8 @@ export async function folderCounts() {
   return { all, uncat, byFolder }
 }
 
-// ================= 背景佇列（只在前景執行） =================
+// ================= 背景佇列 =================
+// 預設只在前景執行；設定 bg_sync 開啟且前景服務正在跑時，切到背景也繼續（見下方「背景下載」）。
 // 兩個工作者各自從資料庫取下一本（依 queue_seq＝加入順序）：
 // - meta：API 隊伍補詳細資料（meta_pending → cover_pending）
 // - cover：圖片隊伍抓封面（cover_pending → ok）
@@ -946,6 +960,7 @@ function retryLater(name, ms) {
     w.timer = null
     kick(name)
   }, ms)
+  syncBgService()
 }
 
 /** 回到前景、網路恢復、按「繼續抓取」時呼叫 */
@@ -955,7 +970,7 @@ export function runQueue() {
   return Promise.all([kick('meta'), kick('cover')])
 }
 
-/** 切到背景時呼叫：目前這本做完就停 */
+/** 切到背景（且背景下載沒在跑）時呼叫：目前這本做完就停 */
 export function stopQueue() {
   paused = true
   for (const w of Object.values(workers)) {
@@ -963,6 +978,193 @@ export function stopQueue() {
     w.timer = null
   }
 }
+
+// ================= 背景下載（前景服務＋通知，設定 bg_sync） =================
+// 服務只讓 App 不被系統停掉並顯示「還有 N 本」，不做網路、不碰資料庫；抓資料仍是上面的佇列與兩條節流隊伍。
+// 何時啟動／更新／停止由純函式 planBgSync 決定（bgSync.js）；服務只在 App 於前景時啟動（Android 12 起的限制）。
+// 服務層不 import i18n：通知文字由介面經 setBgSyncLabels 傳入。
+/** 設定頁顯示用：permission＝目前有通知權限；checked＝已查過至少一次（還沒查過時不顯示「權限已關閉」） */
+export const bgSyncState = reactive({ permission: false, checked: false })
+let appActive = true // App 啟動時一定在前景
+let bgServiceOn = false // JS 認為服務正在跑
+let bgLabels = null // { title, progress（含 {n}）, paused, stop, channel }
+let bgLastText = '' // 上次送到通知的文字：一樣就不重送
+// 服務被停下（通知的「停止」、6 小時到期、啟動失敗）後，到下次「切到背景再回前景」之前不再自動啟動：
+// 「停止」只停這一次（不改設定），也避免啟動失敗時每本書都重試一次
+let bgSuppressed = false
+let bgIdleSince = 0 // 背景中服務開著、卻沒有工作者在跑也沒在等的起始時間（保險：卡住 1 分鐘就停服務）
+const BG_IDLE_STOP_MS = 60_000
+let bgChain = Promise.resolve()
+let bgQueued = null
+
+function bgEnabled() {
+  return settings.bg_sync === '1' && bgSyncState.permission && !!bgLabels && !bgSuppressed
+}
+
+/** 介面傳入通知文字；服務正在跑時立刻更新通知內容 */
+export function setBgSyncLabels(labels) {
+  bgLabels = labels && typeof labels === 'object' ? { ...labels } : null
+  return syncBgService()
+}
+
+/**
+ * 依目前狀態啟動／更新／停止服務。會被很頻繁地呼叫（每本書至少一次）：
+ * 排成一條鏈依序執行，還沒輪到的重複呼叫合併成一次（輪到時才讀狀態，所以合併不會漏）。不丟錯。
+ */
+export function syncBgService() {
+  if (bgQueued) return bgQueued
+  const p = bgChain
+    .then(() => {
+      bgQueued = null
+      return doSyncBgService()
+    })
+    .catch((e) => console.warn('bg sync', e))
+  bgQueued = p
+  bgChain = p
+  return p
+}
+
+async function doSyncBgService() {
+  const running = queueRunning.value
+  const waiting = !!(workers.meta.timer || workers.cover.timer)
+  const halted = !!(queueState.challenge || queueState.error)
+  const pending = pendingCount.value
+  let action = planBgSync({ enabled: bgEnabled(), active: appActive, serviceOn: bgServiceOn, pending, running, waiting, halted })
+
+  // 保險：背景中服務開著、還有待處理，卻沒有工作者在跑也沒在等（例如工作者意外結束）→ 1 分鐘後停掉服務，不白白耗電
+  if (action === 'none' && bgServiceOn && !appActive && pending > 0 && !running && !waiting && !halted) {
+    if (!bgIdleSince) {
+      bgIdleSince = Date.now()
+      setTimeout(() => syncBgService(), BG_IDLE_STOP_MS)
+    } else if (Date.now() - bgIdleSince >= BG_IDLE_STOP_MS - 5_000) {
+      action = 'done'
+    }
+  } else {
+    bgIdleSince = 0
+  }
+
+  switch (action) {
+    case 'start': {
+      const text = fillCount(bgLabels.progress, pending)
+      const ok = await startBgSync({
+        title: bgLabels.title,
+        text,
+        stopLabel: bgLabels.stop,
+        channelName: bgLabels.channel,
+      })
+      if (ok) {
+        bgServiceOn = true
+        bgLastText = text
+      } else {
+        // 退回「只在前景抓」：佇列照常，不顯示錯誤
+        console.warn('background sync could not start')
+        bgServiceOn = false
+        bgSuppressed = true
+      }
+      break
+    }
+    case 'update': {
+      const text = fillCount(bgLabels?.progress, pending)
+      if (text !== bgLastText) {
+        bgLastText = text
+        await updateBgSync(text)
+      }
+      break
+    }
+    case 'done':
+    case 'stop':
+      await stopBgService(false)
+      break
+    case 'paused':
+      // 背景中卡住（驗證、空間不足…）→ 留一則「已暫停，請開啟 App」；在前景就直接移除通知（畫面上已有提示）
+      await stopBgService(!appActive)
+      break
+    default:
+      break
+  }
+}
+
+async function stopBgService(keepPausedNotice) {
+  bgServiceOn = false
+  bgLastText = ''
+  bgIdleSince = 0
+  await stopBgSync({ paused: keepPausedNotice, text: bgLabels?.paused || '' })
+  if (!appActive) stopQueue() // 回到「只在前景」：背景中服務停了，佇列也跟著停
+}
+
+/** 原生端通知服務自己停下（使用者按「停止」、6 小時到期、進不了前景狀態）；設定 bg_sync 不動 */
+function handleBgSyncStopped() {
+  bgServiceOn = false
+  bgLastText = ''
+  bgIdleSince = 0
+  bgSuppressed = true
+  if (!appActive) stopQueue()
+}
+
+/**
+ * App 切到前景／背景（App.vue 的 appStateChange）。
+ * - 背景：背景下載的服務正在跑就繼續抓；否則停下佇列（目前這本做完就停），和以前一樣
+ * - 前景：重新查通知權限（可能在系統設定被收回）→ 續跑佇列 → 視情況啟動服務
+ */
+export function setAppActive(isActive) {
+  const was = appActive
+  appActive = !!isActive
+  if (appActive) {
+    if (!was) bgSuppressed = false
+    runQueue().catch(() => {})
+    refreshBgSyncPermission()
+      .catch(() => {})
+      .finally(() => syncBgService())
+    return
+  }
+  // 等前面排著的服務動作（例如剛送出的啟動）做完，再依「服務有沒有在跑」決定停不停佇列
+  syncBgService().then(() => {
+    if (!appActive && !bgServiceOn) stopQueue()
+  })
+}
+
+/** 背景中有新書寫進資料庫（例如直接收藏）：背景下載正在跑才叫醒工作者；否則不做事（不在背景連網） */
+export function nudgeQueue() {
+  if (!bgServiceOn || paused) return
+  kick('meta')
+  kick('cover')
+}
+
+/** 查目前的通知權限並記在 bgSyncState */
+async function refreshBgSyncPermission() {
+  const granted = await getNotificationPermission()
+  bgSyncState.permission = granted
+  bgSyncState.checked = true
+  return granted
+}
+
+/** 設定頁：目前有沒有通知權限 */
+export function bgSyncPermission() {
+  return refreshBgSyncPermission()
+}
+
+/** 設定頁：請求通知權限（Android 13 起跳系統視窗）；回傳是否已允許 */
+export async function requestBgSyncPermission() {
+  const granted = await requestNotificationPermission()
+  bgSyncState.permission = granted
+  bgSyncState.checked = true
+  return granted
+}
+
+/** 設定頁的開關：寫入 bg_sync，再依狀態啟動或停止服務（關掉時正在跑的服務會停） */
+export async function setBgSyncEnabled(on) {
+  await setSetting('bg_sync', on ? '1' : '0')
+  if (on) bgSuppressed = false
+  await syncBgService()
+}
+
+/** 回到前景時清掉「同步已暫停」那則通知 */
+export function clearBgSyncNotice() {
+  return clearBgSyncNoticeNative()
+}
+
+// 佇列狀態一變就檢查服務要不要啟動／更新／停止（再加上 retryLater、setAppActive、開關等處手動呼叫）
+watch([pendingCount, queueRunning, () => queueState.challenge, () => queueState.error], () => syncBgService())
 
 async function nextPending(status) {
   return (

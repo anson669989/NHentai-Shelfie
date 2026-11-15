@@ -38,7 +38,10 @@ import DialogHost from './components/DialogHost.vue'
 import {
   initLibrary,
   runQueue,
-  stopQueue,
+  setAppActive,
+  nudgeQueue,
+  setBgSyncLabels,
+  clearBgSyncNotice,
   listenForShares,
   listenForQuickShares,
   drainQuickShares,
@@ -66,6 +69,8 @@ const themeVars = computed(() => ({ '--primary': settings.theme_color }))
 
 let lastBack = 0
 const listeners = []
+/** App 是否在前景（appStateChange 更新；啟動時一定在前景） */
+let foreground = true
 
 onMounted(async () => {
   mq?.addEventListener?.('change', onMq)
@@ -74,6 +79,7 @@ onMounted(async () => {
     ready.value = true
     // 標籤翻譯只處理目前介面語言那一份資料（服務層不 import i18n，語言由這裡傳進去；不 await 更新）
     setTagLang(currentLang.value)
+    pushBgSyncLabels()
   } catch (err) {
     console.error(err)
     initError.value = `初始化失敗 / Init failed: ${err?.message || err}`
@@ -96,14 +102,17 @@ onMounted(async () => {
       }
     }),
   )
-  // 背景佇列只在前景執行：切到背景就停，回到前景、網路恢復時自動續跑；App 重開後也會從資料庫接著做
+  // 背景佇列預設只在前景執行：切到背景就停（背景下載開著且服務在跑時繼續），回到前景、網路恢復時自動續跑；
+  // App 重開後也會從資料庫接著做。停／跑佇列與背景下載服務都在 setAppActive 裡處理
   listeners.push(
     await CapApp.addListener('appStateChange', ({ isActive }) => {
+      foreground = !!isActive
+      setAppActive(isActive)
       if (isActive) {
+        clearBgSyncNotice().catch(() => {}) // 「同步已暫停」通知：回到 App 就不需要了
         drainShares()
-        runQueue().catch(() => {})
         maybeUpdateTagTranslations()
-      } else stopQueue()
+      }
     }),
   )
   window.addEventListener('online', onOnline)
@@ -116,7 +125,18 @@ onMounted(async () => {
   listenForShares().catch((e) => console.warn('share listener', e))
 })
 
-const onOnline = () => runQueue().catch(() => {})
+// App 在背景時網路恢復：不另外啟動佇列（不在背景連網）；背景下載正在跑時才叫醒工作者
+const onOnline = () => (foreground ? runQueue().catch(() => {}) : nudgeQueue())
+
+// ---- 背景下載的通知文字（{n} 原樣傳下去，由服務層代換）----
+const pushBgSyncLabels = () =>
+  setBgSyncLabels({
+    title: t('bgSync.title'),
+    progress: t('bgSync.progress'),
+    paused: t('bgSync.paused'),
+    stop: t('bgSync.stop'),
+    channel: t('bgSync.channel'),
+  })
 
 // ---- 快速分享（直接收藏）----
 // {id} 佔位符原樣傳給原生端，由原生代換（t() 對沒給的變數會保留它）
@@ -127,22 +147,40 @@ const pushShareLabels = () =>
     notNh: t('share.notNh'),
     failed: t('share.failed'),
   })
+// App 在背景時處理掉的直接收藏本數：回到前景時一次提示（背景時跳的 toast 看不到）
+let drainedAway = 0
+/**
+ * 收件匣處理完（n＝新增本數）。
+ * - 前景：提示（連同背景時累積的）並啟動佇列
+ * - 背景：只累加，不提示、不啟動佇列（書已寫進資料庫，回到前景才抓）；背景下載正在跑時才叫醒工作者
+ */
 function onDrained(n) {
-  if (n > 0) {
-    toast(t('share.drained', { n }))
-    runQueue().catch(() => {})
+  const added = n > 0 ? n : 0
+  if (!foreground) {
+    if (added) {
+      drainedAway += added
+      nudgeQueue()
+    }
+    return
   }
+  const total = added + drainedAway
+  drainedAway = 0
+  if (total > 0) toast(t('share.drained', { n: total }))
+  if (added) runQueue().catch(() => {})
 }
 async function drainShares() {
+  let n = 0
   try {
-    onDrained(await drainQuickShares())
+    n = await drainQuickShares()
   } catch (e) {
     console.warn('drain quick shares failed', e)
   }
+  onDrained(n)
 }
 watch(currentLang, (lang) => {
   if (!ready.value) return
   pushShareLabels()
+  pushBgSyncLabels()
   setTagLang(lang) // 開關開著時，依新語言檢查一次（沒有資料就下載，有資料照 24 小時規則）
 })
 watch(sharedInput, (v) => {
