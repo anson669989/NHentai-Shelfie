@@ -19,6 +19,18 @@
 // 軟鍵盤（Android 15 edge-to-edge 下網頁量不到鍵盤）：
 // NhWebFetch.getKeyboardOverlap()           → { height }：鍵盤蓋住 WebView 底部的高度（CSS px）
 // NhWebFetch.addListener('keyboardOverlap') ：高度改變時 { height }
+//
+// 背景下載（設定 bg_sync；前景服務 SyncService 只保活與顯示通知，不做網路、不碰資料庫）：
+// NhWebFetch.getNotificationPermission()    → { granted }：API 32 以下一律 true；33+ 要有 POST_NOTIFICATIONS 且通知沒被關
+// NhWebFetch.requestNotificationPermission()→ { granted }：API 33+ 跳系統視窗；32 以下直接回通知是否開著
+// NhWebFetch.startBgSync({ title, text, stopLabel, channelName }) → {}：啟動服務並顯示通知（只在 App 於前景時呼叫）；
+//   失敗 reject BG_SYNC_FAILED（例：App 已在背景、權限問題）
+// NhWebFetch.updateBgSync({ text })        → {}：更新通知文字；服務沒在跑就不做事
+// NhWebFetch.stopBgSync({ paused, text })   → {}：停止服務、移除通知；paused 為 true 時另留一則「已暫停」通知（文字＝text）
+// NhWebFetch.clearBgSyncNotice()            → {}：清掉「已暫停」通知
+// NhWebFetch.delay({ ms })                  → {}：等 ms（0–60000）毫秒；原生計時，不受背景網頁計時器限速影響
+// NhWebFetch.addListener('bgSyncStopped')   ：服務自己停下 { reason: 'user'（按通知的停止）| 'timeout'（6 小時到期）
+//   | 'failed'（startBgSync 已 resolve，但服務進不了前景狀態）}
 import { registerPlugin } from '@capacitor/core'
 
 export const NhWebFetch = registerPlugin('NhWebFetch')

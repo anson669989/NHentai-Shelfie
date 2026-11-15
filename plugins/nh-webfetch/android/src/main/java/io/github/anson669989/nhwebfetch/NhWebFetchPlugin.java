@@ -4,10 +4,12 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -28,6 +30,8 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -36,10 +40,13 @@ import androidx.webkit.WebViewFeature;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -69,9 +76,22 @@ import java.util.regex.Pattern;
  *   handleOnNewIntent 接收並發出 shareReceived 事件；JS 端以 takeSharedText() 取出（取出即清除，不會重複處理）。
  * - 「直接收藏」：ID 記進 QuickShareStore 的收件匣（原生端不碰 SQLite），發出 quickShareReceived 事件；
  *   JS 以 setQuickShareConfig / peekQuickShares / ackQuickShares 同步設定與處理收件匣。
+ *
+ * 背景下載（設定 bg_sync，預設關閉）：startBgSync / updateBgSync / stopBgSync 控制前景服務 SyncService
+ * （只保活與顯示進度通知，不做網路、不碰資料庫；抓資料仍是 JS 的佇列）。通知權限以 getNotificationPermission /
+ * requestNotificationPermission 查詢與請求。服務被使用者按「停止」、6 小時到期或啟動失敗時發出 bgSyncStopped 事件。
+ * delay 以主執行緒 Handler 計時，給 App 在背景時（網頁計時器可能被放慢）的節流等待用。
  */
-@CapacitorPlugin(name = "NhWebFetch")
+@CapacitorPlugin(
+    name = "NhWebFetch",
+    permissions = {
+        @Permission(alias = NhWebFetchPlugin.NOTIFICATIONS, strings = { "android.permission.POST_NOTIFICATIONS" })
+    }
+)
 public class NhWebFetchPlugin extends Plugin {
+
+    static final String NOTIFICATIONS = "notifications";
+    private static final int MAX_DELAY_MS = 60_000;
 
     private static final String HOME = "https://nhentai.net/";
     private static final String ORIGIN = "https://nhentai.net";
@@ -136,6 +156,18 @@ public class NhWebFetchPlugin extends Plugin {
             p = instance == null ? null : instance.get();
         }
         if (p != null) p.notifyListeners("quickShareReceived", new JSObject(), true);
+    }
+
+    /** 背景下載服務自己停下（user＝按通知的「停止」、timeout＝6 小時到期、failed＝無法進入前景）時通知 JS。 */
+    static void notifyBgSyncStopped(String reason) {
+        NhWebFetchPlugin p;
+        synchronized (NhWebFetchPlugin.class) {
+            p = instance == null ? null : instance.get();
+        }
+        if (p == null) return;
+        JSObject ret = new JSObject();
+        ret.put("reason", reason);
+        p.notifyListeners("bgSyncStopped", ret, true);
     }
 
     @Override
@@ -289,6 +321,121 @@ public class NhWebFetchPlugin extends Plugin {
         call.resolve();
     }
 
+    // ------------------------------------------------------------------ 背景下載（前景服務＋通知）
+
+    /** 是否能顯示通知：API 32 以下一律 true；API 33+ 要有 POST_NOTIFICATIONS 且通知沒被關掉。 */
+    private boolean notificationsGranted() {
+        if (Build.VERSION.SDK_INT < 33) return true;
+        return getPermissionState(NOTIFICATIONS) == PermissionState.GRANTED
+            && NotificationManagerCompat.from(getContext()).areNotificationsEnabled();
+    }
+
+    private static void resolveGranted(PluginCall call, boolean granted) {
+        JSObject ret = new JSObject();
+        ret.put("granted", granted);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void getNotificationPermission(PluginCall call) {
+        try {
+            resolveGranted(call, notificationsGranted());
+        } catch (Exception e) {
+            resolveGranted(call, false);
+        }
+    }
+
+    /** API 33+ 跳系統視窗詢問（已允許或已永久拒絕時不會跳）；API 32 以下沒有執行期權限，直接回通知是否開著。 */
+    @PluginMethod
+    public void requestNotificationPermission(PluginCall call) {
+        try {
+            if (Build.VERSION.SDK_INT < 33) {
+                resolveGranted(call, NotificationManagerCompat.from(getContext()).areNotificationsEnabled());
+                return;
+            }
+            if (getPermissionState(NOTIFICATIONS) == PermissionState.GRANTED) {
+                resolveGranted(call, notificationsGranted());
+                return;
+            }
+            requestPermissionForAlias(NOTIFICATIONS, call, "notificationPermissionCallback");
+        } catch (Exception e) {
+            resolveGranted(call, false);
+        }
+    }
+
+    @PermissionCallback
+    private void notificationPermissionCallback(PluginCall call) {
+        try {
+            resolveGranted(call, notificationsGranted());
+        } catch (Exception e) {
+            resolveGranted(call, false);
+        }
+    }
+
+    /**
+     * 啟動前景服務（只應在 App 於前景時呼叫）。任何例外（Android 12 起背景不能啟動前景服務、權限問題…）都
+     * reject BG_SYNC_FAILED，不讓 App 當掉；JS 端退回「只在前景抓」。
+     */
+    @PluginMethod
+    public void startBgSync(PluginCall call) {
+        try {
+            Context ctx = getContext().getApplicationContext();
+            Intent intent = new Intent(ctx, SyncService.class)
+                .setAction(SyncService.ACTION_START)
+                .putExtra(SyncService.EXTRA_TITLE, call.getString("title", ""))
+                .putExtra(SyncService.EXTRA_TEXT, call.getString("text", ""))
+                .putExtra(SyncService.EXTRA_STOP_LABEL, call.getString("stopLabel", ""))
+                .putExtra(SyncService.EXTRA_CHANNEL_NAME, call.getString("channelName", ""));
+            ContextCompat.startForegroundService(ctx, intent);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("background sync could not start", "BG_SYNC_FAILED");
+        }
+    }
+
+    /** 更新通知文字；服務沒在跑就什麼都不做。 */
+    @PluginMethod
+    public void updateBgSync(PluginCall call) {
+        if (SyncService.running) {
+            try {
+                Context ctx = getContext().getApplicationContext();
+                Intent intent = new Intent(ctx, SyncService.class)
+                    .setAction(SyncService.ACTION_UPDATE)
+                    .putExtra(SyncService.EXTRA_TEXT, call.getString("text", ""));
+                ctx.startService(intent);
+            } catch (Exception ignored) {
+                // 服務剛好停了：下次 syncBgService 會依狀態處理
+            }
+        }
+        call.resolve();
+    }
+
+    /** 停止服務並移除進度通知；paused 為 true 時留下一則「已暫停」通知（文字＝text）。 */
+    @PluginMethod
+    public void stopBgSync(PluginCall call) {
+        try {
+            SyncService.stop(getContext(), Boolean.TRUE.equals(call.getBoolean("paused", false)), call.getString("text", ""));
+        } catch (Exception ignored) {
+            // 服務本來就沒在跑
+        }
+        call.resolve();
+    }
+
+    /** 清掉「已暫停」那則通知（App 回到前景時）。 */
+    @PluginMethod
+    public void clearBgSyncNotice(PluginCall call) {
+        SyncService.cancelPausedNotice(getContext());
+        call.resolve();
+    }
+
+    /** 等 ms 毫秒（0–60000）後 resolve。用主執行緒 Handler 計時，不受網頁計時器在背景被放慢影響。 */
+    @PluginMethod
+    public void delay(PluginCall call) {
+        Integer raw = call.getInt("ms", 0);
+        int ms = Math.max(0, Math.min(raw == null ? 0 : raw, MAX_DELAY_MS));
+        main.postDelayed(call::resolve, ms);
+    }
+
     // ------------------------------------------------------------------ API
 
     /**
@@ -389,6 +536,12 @@ public class NhWebFetchPlugin extends Plugin {
     protected void handleOnDestroy() {
         synchronized (NhWebFetchPlugin.class) {
             if (instance != null && instance.get() == this) instance = null;
+        }
+        // Activity 結束：JS 也沒了，背景下載服務留著沒有意義（「已暫停」通知不動）
+        try {
+            SyncService.stop(getContext(), false, null);
+        } catch (Exception ignored) {
+            // 服務本來就沒在跑
         }
         main.post(this::releaseWebView);
         super.handleOnDestroy();

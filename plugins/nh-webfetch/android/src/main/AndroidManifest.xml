@@ -1,5 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 不宣告任何權限：只用 App 既有的 INTERNET -->
+    <!-- App 本身只有 INTERNET。以下四個只給「背景下載」（設定 bg_sync，預設關閉）使用，cap sync 會自動合併：
+         - FOREGROUND_SERVICE、FOREGROUND_SERVICE_DATA_SYNC：前景服務 SyncService（Android 14 起要宣告類型）
+         - POST_NOTIFICATIONS：顯示進度通知（Android 13 起會跳視窗問使用者；只在打開背景下載時才請求）
+         - WAKE_LOCK：關螢幕後 CPU 不睡著，佇列才會繼續（不會跳視窗）
+         SyncService 只保活與顯示通知，不做網路、不碰資料庫。 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <application>
         <!-- 瀏覽器「分享」的唯一入口：依設定轉給 MainActivity，或直接收藏（無畫面）。不設 label／icon，沿用 App 的 -->
         <activity
@@ -15,5 +23,10 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+        <!-- 背景下載：前景服務＋進度通知（只在 App 於前景時啟動） -->
+        <service
+            android:name="io.github.anson669989.nhwebfetch.SyncService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>
